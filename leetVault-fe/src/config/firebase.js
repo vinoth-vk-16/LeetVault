@@ -2,12 +2,12 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBoGIB4eJr-yQsP29lz_8P_Yoxluvp1kO8",
-  authDomain: "leetvault.firebaseapp.com",
-  projectId: "leetvault",
-  storageBucket: "leetvault.firebasestorage.app",
-  messagingSenderId: "936596808008",
-  appId: "1:936596808008:web:91481674f3a9476bc3d37d"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Initialize Firebase
