@@ -74,8 +74,7 @@ class FetchRequest(BaseModel):
     output_dir: Optional[str] = "leetcode"
     languages: Optional[List[str]] = ["python3"]
 
-class SyncRequest(BaseModel):
-    user_id: Optional[str] = None  # If provided, sync only this user's repo
+# Removed SyncRequest - no longer needed as we always sync all active repos
 
 class FetchStatus(BaseModel):
     status: str
@@ -564,8 +563,8 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
         print(f"  ❌ Failed to sync {repo_full_name}: {str(e)}")
         return {"repo": repo_full_name, "status": "failed", "error": str(e)}
 
-async def sync_all_active_repos(user_id: Optional[str] = None):
-    """Sync all active repositories with LeetCode data"""
+async def sync_all_active_repos():
+    """Sync all active repositories with LeetCode data in parallel"""
     global fetch_status
     
     try:
@@ -575,10 +574,8 @@ async def sync_all_active_repos(user_id: Optional[str] = None):
             "last_fetch_time": datetime.now().isoformat()
         })
         
-        # Get active repositories
+        # Get ALL active repositories (no user filter)
         queries = [Query.equal("isActive", True)]
-        if user_id:
-            queries.append(Query.equal("userId", user_id))
         
         result = databases.list_documents(
             database_id=APPWRITE_DATABASE_ID,
@@ -596,7 +593,8 @@ async def sync_all_active_repos(user_id: Optional[str] = None):
             })
             return []
         
-        sync_results = []
+        # Prepare tasks for parallel execution
+        tasks = []
         
         for repo in active_repos:
             # Get user's LeetCode credentials
@@ -605,29 +603,43 @@ async def sync_all_active_repos(user_id: Optional[str] = None):
             
             if not credentials:
                 print(f"⚠️ No LeetCode credentials found for user {user_id}")
-                sync_results.append({
-                    "repo": repo["repoFullName"],
-                    "status": "no_credentials"
-                })
                 continue
             
-            # Sync repository
-            result = await sync_repo_with_leetcode(
+            # Create task for parallel execution
+            task = sync_repo_with_leetcode(
                 repo,
                 credentials,
                 ["python3"]  # Default language, can be made configurable
             )
-            sync_results.append(result)
+            tasks.append(task)
         
-        total_problems = sum(r.get("problems", 0) for r in sync_results if r.get("status") == "success")
-
+        # Execute all syncs in parallel
+        print(f"🚀 Starting parallel sync for {len(tasks)} repositories...")
+        sync_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Process results and handle exceptions
+        processed_results = []
+        for i, result in enumerate(sync_results):
+            if isinstance(result, Exception):
+                print(f"❌ Task {i} failed with exception: {str(result)}")
+                processed_results.append({
+                    "status": "failed",
+                    "error": str(result)
+                })
+            else:
+                processed_results.append(result)
+        
+        total_problems = sum(r.get("problems", 0) for r in processed_results if isinstance(r, dict) and r.get("status") == "success")
+        successful_syncs = sum(1 for r in processed_results if isinstance(r, dict) and r.get("status") == "success")
+        
         fetch_status.update({
             "status": "completed",
-            "message": f"Synced {len(active_repos)} repositories with {total_problems} problems",
+            "message": f"Synced {successful_syncs}/{len(active_repos)} repositories with {total_problems} problems",
             "problems_processed": total_problems
         })
-
-        return sync_results
+        
+        print(f"✅ Parallel sync completed: {successful_syncs}/{len(active_repos)} successful")
+        return processed_results
 
     except Exception as e:
         fetch_status.update({
@@ -638,20 +650,21 @@ async def sync_all_active_repos(user_id: Optional[str] = None):
         raise
 
 @app.post("/sync")
-async def trigger_sync(background_tasks: BackgroundTasks, request: SyncRequest = None):
-    """Trigger sync for all active repositories or a specific user's repo"""
+async def trigger_sync(background_tasks: BackgroundTasks):
+    """
+    Trigger parallel sync for ALL active repositories
+    This will process all active repos simultaneously for maximum efficiency
+    """
     global fetch_status
-
+    
     if fetch_status["status"] == "running":
         raise HTTPException(status_code=409, detail="Sync already in progress")
     
-    user_id = request.user_id if request else None
-    background_tasks.add_task(sync_all_active_repos, user_id)
-
+    background_tasks.add_task(sync_all_active_repos)
+    
     return {
-        "message": "Sync started successfully",
-        "status": "running",
-        "user_id": user_id
+        "message": "Parallel sync started for all active repositories",
+        "status": "running"
     }
 
 @app.get("/status")

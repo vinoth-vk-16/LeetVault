@@ -85,7 +85,24 @@ npm run dev
 
 ## Firebase Configuration
 
-The application is configured with Firebase for Google Authentication. The configuration is located in `src/config/firebase.js`.
+The application uses Firebase for Google Authentication. Configuration is loaded from environment variables.
+
+### Setup
+
+1. Copy the example environment file:
+```bash
+cp env.example .env
+```
+
+2. Update `.env` with your Firebase credentials:
+```env
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
 
 **Firebase Project**: leetvault
 - Authentication: Google Sign-In enabled
@@ -186,7 +203,7 @@ The application uses Tailwind CSS with a dark theme palette:
 The frontend connects to the backend API at `http://localhost:8000` by default. This is configured in `HomePage.jsx`:
 
 ```javascript
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://69481ac30014e1672988.sgp.appwrite.run';
 ```
 
 ## License
