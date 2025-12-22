@@ -45,6 +45,7 @@ leetvault/
 - LeetCode credentials storage
 
 #### 2. leetcode_fetch (Sync Service)
+- **Appwrite Scheduled Execution**: Automatically triggered by Appwrite cron (daily at 6:20 PM UTC)
 - **Parallel Processing**: Syncs ALL active repos simultaneously
 - Fetches LeetCode submissions via GraphQL
 - Pushes to GitHub repositories
@@ -104,12 +105,14 @@ pip install -r requirements.txt
 2. **Connect GitHub**: Install LeetVault GitHub App
 3. **Select Repository**: Choose a repo to sync
 4. **Add LeetCode Credentials**: Provide session cookie & CSRF token
-5. **Automatic Sync**: Service syncs submissions every 6-12 hours
+5. **Automatic Sync**: Appwrite scheduler triggers sync daily at 6:20 PM UTC
 
-### Sync Process (Parallel)
+### Sync Process (Scheduled & Parallel)
 
 ```
-Trigger Sync
+Appwrite Scheduler (Daily at 6:20 PM UTC)
+    ↓
+Detect Scheduled Execution
     ↓
 Fetch ALL Active Repos (from Appwrite)
     ↓
@@ -125,6 +128,8 @@ For Each Repo (concurrent):
     ↓
 Return Results
 ```
+
+**Manual Trigger**: Also available via `/sync` endpoint for immediate sync.
 
 ### Performance
 

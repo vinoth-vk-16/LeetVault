@@ -304,45 +304,57 @@ Check Appwrite Functions console for detailed logs:
 
 ## Scheduling
 
-### Option 1: Appwrite Scheduled Function
+### Appwrite Native Scheduler (Recommended)
 
-Configure the function to run on a schedule:
-- Every 6 hours: `0 */6 * * *`
-- Every 12 hours: `0 */12 * * *`
-- Daily at midnight: `0 0 * * *`
+The function automatically detects and handles scheduled execution from Appwrite.
 
-### Option 2: External Cron Job
+**How to Configure:**
 
-Use cron-job.org or similar:
+1. **Go to Appwrite Console** → Your Function → Settings
+2. **Enable "Schedule"**
+3. **Set Cron Expression**: `20 18 * * *` (6:20 PM UTC daily)
+4. **Save**
+
+**Cron Expression Examples:**
+
+| Expression | Description |
+|------------|-------------|
+| `20 18 * * *` | Daily at 6:20 PM UTC |
+| `0 */6 * * *` | Every 6 hours |
+| `0 0,12 * * *` | Twice daily (midnight and noon) |
+| `0 2 * * *` | Daily at 2:00 AM UTC |
+| `0 0 * * 0` | Weekly on Sunday at midnight |
+
+**How It Works:**
+
+When Appwrite scheduler triggers the function:
+1. Function detects scheduled execution (no headers, GET to `/`)
+2. Runs `sync_all_active_repos()` directly
+3. Returns JSON with results and timestamp
+
+**Scheduled Response:**
+```json
+{
+  "scheduled_sync": true,
+  "results": [...],
+  "executed_at": "2025-12-22T18:20:00",
+  "message": "Scheduled sync completed successfully"
+}
+```
+
+### Manual Trigger
+
+For immediate sync or testing:
 
 ```bash
-# Every 6 hours
-0 */6 * * * curl -X POST https://your-function-url/sync
+curl -X POST https://your-function-url/sync
 ```
 
-### Option 3: GitHub Actions
+This triggers the sync via FastAPI endpoint (runs in background).
 
-```yaml
-name: Trigger LeetCode Sync
-on:
-  schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+### Verify Schedule
 
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Sync
-        run: |
-          curl -X POST https://your-function-url/sync \
-            -H "Content-Type: application/json"
-      
-      - name: Wait and Check Status
-        run: |
-          sleep 30
-          curl https://your-function-url/status
-```
+Check **Appwrite Console** → Your Function → **Executions** to see scheduled runs.
 
 ---
 

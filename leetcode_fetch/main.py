@@ -232,12 +232,10 @@ async def update_user_session_cookie(credential_id: str, new_session_cookie: str
         print(f"❌ Failed to update session cookie: {str(e)}")
 
 def get_all_submissions(session_token: str, csrf_token: str = None) -> List[Dict]:
-    """Fetch all accepted submissions from last 48 hours"""
+    """Fetch all accepted submissions"""
     subs = []
     offset = 0
     limit = 20
-
-    last_48h_timestamp = int(time.time() - 48 * 60 * 60)
 
     while True:
         data = graphql_request(
@@ -257,13 +255,13 @@ def get_all_submissions(session_token: str, csrf_token: str = None) -> List[Dict
         )
         s = data["data"]["submissionList"]
 
-        recent_accepted_subs = [
+        accepted_subs = [
             sub for sub in s["submissions"]
-            if sub["statusDisplay"] == "Accepted" and int(sub["timestamp"]) >= last_48h_timestamp
+            if sub["statusDisplay"] == "Accepted"
         ]
-        subs.extend(recent_accepted_subs)
+        subs.extend(accepted_subs)
 
-        if not s["hasNext"] or len(recent_accepted_subs) == 0:
+        if not s["hasNext"]:
             break
         offset += limit
 
@@ -376,10 +374,10 @@ def generate_problem_files_content(summary: List[Dict], languages: List[str]) ->
             content += "| No | Title | Source Code |\n"
             content += "|----|-------|-------------|\n"
 
-            for i, item in enumerate(sorted(problems, key=lambda x: x["title"]), 1):
-                slug = item["slug"]
-                title = item["title"]
-                url = f"./{slug}"
+                for i, item in enumerate(sorted(problems, key=lambda x: x["title"]), 1):
+                    slug = item["slug"]
+                    title = item["title"]
+                url = f"./leetcode/{slug}"
                 content += f"| {i} | {title} | [Link]({url}) |\n"
             
             content += "\n---\n\n*Back to [LeetCode Progress](./LeetcodeProgress.md)*\n"
@@ -631,13 +629,13 @@ async def sync_all_active_repos():
         
         total_problems = sum(r.get("problems", 0) for r in processed_results if isinstance(r, dict) and r.get("status") == "success")
         successful_syncs = sum(1 for r in processed_results if isinstance(r, dict) and r.get("status") == "success")
-        
+
         fetch_status.update({
             "status": "completed",
             "message": f"Synced {successful_syncs}/{len(active_repos)} repositories with {total_problems} problems",
             "problems_processed": total_problems
         })
-        
+
         print(f"✅ Parallel sync completed: {successful_syncs}/{len(active_repos)} successful")
         return processed_results
 
@@ -656,12 +654,12 @@ async def trigger_sync(background_tasks: BackgroundTasks):
     This will process all active repos simultaneously for maximum efficiency
     """
     global fetch_status
-    
+
     if fetch_status["status"] == "running":
         raise HTTPException(status_code=409, detail="Sync already in progress")
-    
+
     background_tasks.add_task(sync_all_active_repos)
-    
+
     return {
         "message": "Parallel sync started for all active repositories",
         "status": "running"
@@ -684,6 +682,27 @@ async def main(context):
         req = context.req
         path = req.path if hasattr(req, 'path') and req.path else "/"
         method = (req.method if hasattr(req, 'method') and req.method else "GET").upper()
+        
+        # ✅ DETECT SCHEDULED EXECUTION (no real HTTP request)
+        # When Appwrite schedule triggers, there's no proper path/headers
+        is_scheduled = (
+            path == "/" and 
+            method == "GET" and 
+            (not hasattr(req, 'headers') or not req.headers or len(dict(req.headers)) == 0)
+        )
+        
+        if is_scheduled:
+            # This is a scheduled cron trigger - run sync directly
+            print("🕐 Scheduled execution triggered by Appwrite cron")
+            results = await sync_all_active_repos()
+            return context.res.json({
+                "scheduled_sync": True,
+                "results": results,
+                "executed_at": datetime.now().isoformat(),
+                "message": "Scheduled sync completed successfully"
+            })
+        
+        # ✅ NORMAL HTTP REQUEST HANDLING
         headers = dict(req.headers) if hasattr(req, 'headers') and req.headers else {}
         query_params = {}
         if hasattr(req, 'query') and req.query:
