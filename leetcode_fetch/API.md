@@ -12,23 +12,47 @@ https://your-appwrite-function-url.appwrite.run
 
 ### 1. POST `/sync`
 
-Trigger parallel sync for ALL active repositories.
+Trigger parallel sync for active repositories.
 
-**Description**: Fetches LeetCode submissions for all users with active repositories and pushes the data to their GitHub repos in parallel.
+**Description**: Fetches LeetCode submissions for users with active repositories and pushes the data to their GitHub repos in parallel. Can sync all users or a specific user.
 
-**Request**:
+**Request Body** (optional):
+```json
+{
+  "user_email": "user@example.com"  // Optional: sync only this user
+}
+```
+
+**Examples**:
+
+**Sync All Users:**
 ```bash
 curl -X POST https://your-function-url/sync \
   -H "Content-Type: application/json"
 ```
 
-**Request Body**: None required
+**Sync Specific User:**
+```bash
+curl -X POST https://your-function-url/sync \
+  -H "Content-Type: application/json" \
+  -d '{"user_email": "user@example.com"}'
+```
 
-**Response** (200 OK):
+**Response (All Users)** (200 OK):
 ```json
 {
   "message": "Parallel sync started for all active repositories",
-  "status": "running"
+  "status": "running",
+  "user_email": null
+}
+```
+
+**Response (Specific User)** (200 OK):
+```json
+{
+  "message": "Sync started for user user@example.com",
+  "status": "running",
+  "user_email": "user@example.com"
 }
 ```
 
@@ -39,10 +63,15 @@ curl -X POST https://your-function-url/sync \
 }
 ```
 
+**Parameters**:
+- `user_email` (optional): Email address of the user to sync. If omitted, syncs all active repositories.
+
 **Notes**:
-- Processes all active repositories concurrently using `asyncio.gather()`
+- Processes repositories concurrently using `asyncio.gather()`
 - Returns immediately and runs sync in background
 - Check `/status` endpoint for progress
+- User email is converted to `userId` format internally (e.g., `user@example.com` → `user_example_com`)
+- **Sends email notification** to each user after their sync completes with progress summary
 
 ---
 
@@ -414,6 +443,48 @@ curl https://your-function-url/status
 
 ---
 
+## Email Notifications
+
+### Overview
+
+After each successful sync, the service automatically sends a beautiful HTML email to the user with their progress summary.
+
+### Email Content
+
+- **Subject**: `🎉 LeetVault Sync Complete - X Problems Synced`
+- **Design**: Professional white theme with Times New Roman font
+- **Branding**: LeetVault logo and gradient header
+- **Content**:
+  - Total problems synced
+  - Easy problems count (green)
+  - Medium problems count (yellow)
+  - Hard problems count (red)
+  - Repository name
+  - Sync timestamp
+
+### Configuration
+
+Requires Gmail credentials in environment variables:
+
+```env
+GMAIL_USER=your_email@gmail.com
+GMAIL_APP_PASSWORD=your_16_char_app_password
+```
+
+**How to get Gmail App Password:**
+1. Go to Google Account → Security → 2-Step Verification
+2. Scroll to "App passwords"
+3. Generate new app password for "Mail"
+4. Copy the 16-character password
+
+### Behavior
+
+- ✅ If credentials configured: Sends email after each user's sync
+- ⚠️ If credentials missing: Logs warning and continues without email
+- ❌ If email fails: Logs error but doesn't fail the sync
+
+---
+
 ## Security
 
 ### Authentication
@@ -427,6 +498,7 @@ curl https://your-function-url/status
 - LeetCode session cookies stored encrypted in Appwrite
 - GitHub tokens generated per-request (not stored)
 - User data isolated by `userId`
+- Email credentials stored securely in environment variables
 
 ### Best Practices
 
@@ -435,6 +507,7 @@ curl https://your-function-url/status
 3. Enable Appwrite Functions logging
 4. Monitor for suspicious activity
 5. Implement rate limiting on public endpoints
+6. Use Gmail App Password (not regular password)
 
 ---
 

@@ -12,19 +12,49 @@ Automated LeetCode sync service with Appwrite scheduled execution support.
 - 💾 **Appwrite Database**: Manages users, credentials, and active repos
 - ⚡ **High Performance**: Can handle 1000+ users concurrently
 - 🔄 **Dual Trigger**: Scheduled execution + manual trigger support
+- 📧 **Email Notifications**: Sends beautiful HTML email reports after each sync
 
 ## 🧰 API Endpoints
 
 ### POST `/sync`
 
-Manually trigger sync for ALL active repositories.
+Manually trigger sync for active repositories.
 
-**Response:**
+**Request Body (optional):**
+```json
+{
+  "user_email": "user@example.com"
+}
+```
+
+**Response (all users):**
 ```json
 {
   "message": "Parallel sync started for all active repositories",
-  "status": "running"
+  "status": "running",
+  "user_email": null
 }
+```
+
+**Response (specific user):**
+```json
+{
+  "message": "Sync started for user user@example.com",
+  "status": "running",
+  "user_email": "user@example.com"
+}
+```
+
+**Usage:**
+```bash
+# Sync all users
+curl -X POST https://your-function-url/sync \
+  -H "Content-Type: application/json"
+
+# Sync specific user
+curl -X POST https://your-function-url/sync \
+  -H "Content-Type: application/json" \
+  -d '{"user_email": "user@example.com"}'
 ```
 
 ### GET `/status`
@@ -92,9 +122,22 @@ APPWRITE_DATABASE_ID=your_database_id
 GITHUB_APP_ID=your_app_id
 GITHUB_PRIVATE_KEY_PATH="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
 
+# Email Configuration (for sync notifications)
+GMAIL_USER=your_email@gmail.com
+GMAIL_APP_PASSWORD=your_16_char_app_password
+
 # Optional
 GRAPHQL_URL=https://leetcode.com/graphql
 ```
+
+### Setting Up Gmail App Password
+
+1. Go to your Google Account settings
+2. Navigate to Security → 2-Step Verification
+3. Scroll down to "App passwords"
+4. Generate a new app password for "Mail"
+5. Copy the 16-character password
+6. Add it to your environment variables as `GMAIL_APP_PASSWORD`
 
 ## 🕐 How Scheduled Execution Works
 
@@ -128,6 +171,25 @@ curl -X POST https://your-function-url/sync
 ```
 
 This routes through FastAPI and runs sync in the background.
+
+## 📧 Email Notifications
+
+After each successful sync, users receive a beautiful HTML email with:
+
+- **LeetVault branding** with gradient header
+- **Total problems synced**
+- **Breakdown by difficulty** (Easy, Medium, Hard)
+- **Repository name**
+- **Sync timestamp**
+- **Professional white theme** with Times New Roman font
+
+**Email Preview:**
+- Clean, professional design
+- Mobile-responsive layout
+- Color-coded difficulty stats (Green for Easy, Yellow for Medium, Red for Hard)
+- Motivational footer message
+
+**Note**: Email notifications require Gmail credentials in environment variables. If not configured, sync will continue without sending emails.
 
 ## 📊 Generated Repository Structure
 

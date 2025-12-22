@@ -15,6 +15,9 @@ from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.query import Query
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Load environment variables from .env file
 load_dotenv()
@@ -31,6 +34,10 @@ APPWRITE_DATABASE_ID = os.getenv("APPWRITE_DATABASE_ID")
 # GitHub App Configuration
 GITHUB_APP_ID = int(os.getenv("GITHUB_APP_ID", "0"))
 GITHUB_PRIVATE_KEY_PATH = os.getenv("GITHUB_PRIVATE_KEY_PATH", "")
+
+# Email Configuration
+GMAIL_USER = os.getenv("GMAIL_USER", "")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 
 # Hardcoded collection IDs (from your Appwrite database)
 COLLECTION_IDS = {
@@ -374,9 +381,9 @@ def generate_problem_files_content(summary: List[Dict], languages: List[str]) ->
             content += "| No | Title | Source Code |\n"
             content += "|----|-------|-------------|\n"
 
-                for i, item in enumerate(sorted(problems, key=lambda x: x["title"]), 1):
-                    slug = item["slug"]
-                    title = item["title"]
+            for i, item in enumerate(sorted(problems, key=lambda x: x["title"]), 1):
+                slug = item["slug"]
+                title = item["title"]
                 url = f"./leetcode/{slug}"
                 content += f"| {i} | {title} | [Link]({url}) |\n"
             
@@ -384,6 +391,249 @@ def generate_problem_files_content(summary: List[Dict], languages: List[str]) ->
             files_content[f"{difficulty.lower()}-problems.md"] = content
     
     return files_content
+
+def generate_email_html(user_email: str, summary: List[Dict], repo_name: str) -> str:
+    """Generate HTML email content for sync notification"""
+    total = len(summary)
+    count = {"Easy": 0, "Medium": 0, "Hard": 0}
+    for item in summary:
+        count[item["difficulty"]] += 1
+    
+    current_time = datetime.now().strftime("%B %d, %Y at %I:%M %p UTC")
+    
+    html = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {{
+            font-family: 'Times New Roman', Times, serif;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 0;
+        }}
+        .container {{
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+        }}
+        .header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }}
+        .header h1 {{
+            margin: 0;
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }}
+        .header p {{
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }}
+        .content {{
+            padding: 40px 30px;
+        }}
+        .greeting {{
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+        }}
+        .stats-container {{
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            border-left: 4px solid #667eea;
+        }}
+        .stat-title {{
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }}
+        .stat-row {{
+            display: table;
+            width: 100%;
+            margin-bottom: 15px;
+        }}
+        .stat-label {{
+            display: table-cell;
+            font-size: 16px;
+            color: #555;
+            padding: 8px 0;
+        }}
+        .stat-value {{
+            display: table-cell;
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            text-align: right;
+            padding: 8px 0;
+        }}
+        .difficulty-stats {{
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }}
+        .difficulty-row {{
+            display: table;
+            width: 100%;
+            margin-bottom: 12px;
+        }}
+        .difficulty-label {{
+            display: table-cell;
+            font-size: 15px;
+            color: #666;
+            padding: 5px 0;
+        }}
+        .difficulty-value {{
+            display: table-cell;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: right;
+            padding: 5px 0;
+        }}
+        .easy {{ color: #00b894; }}
+        .medium {{ color: #fdcb6e; }}
+        .hard {{ color: #d63031; }}
+        .repo-info {{
+            background-color: #e8f4f8;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }}
+        .repo-info p {{
+            margin: 5px 0;
+            color: #555;
+            font-size: 14px;
+        }}
+        .repo-name {{
+            font-weight: bold;
+            color: #667eea;
+            font-size: 16px;
+        }}
+        .footer {{
+            background-color: #f8f9fa;
+            padding: 25px 30px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+        }}
+        .footer p {{
+            margin: 5px 0;
+            color: #666;
+            font-size: 13px;
+        }}
+        .timestamp {{
+            color: #999;
+            font-size: 12px;
+            font-style: italic;
+            margin-top: 15px;
+        }}
+        .divider {{
+            height: 1px;
+            background-color: #e0e0e0;
+            margin: 25px 0;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>LEETVAULT</h1>
+            <p>Your LeetCode Progress Sync Report</p>
+        </div>
+        
+        <div class="content">
+            <p class="greeting">Hello,</p>
+            <p class="greeting">Your LeetCode progress has been successfully synced to your GitHub repository!</p>
+            
+            <div class="stats-container">
+                <div class="stat-title">📊 Sync Summary</div>
+                
+                <div class="stat-row">
+                    <span class="stat-label">Total Problems Synced</span>
+                    <span class="stat-value">{total}</span>
+                </div>
+                
+                <div class="difficulty-stats">
+                    <div class="difficulty-row">
+                        <span class="difficulty-label">✅ Easy Problems</span>
+                        <span class="difficulty-value easy">{count['Easy']}</span>
+                    </div>
+                    <div class="difficulty-row">
+                        <span class="difficulty-label">⚡ Medium Problems</span>
+                        <span class="difficulty-value medium">{count['Medium']}</span>
+                    </div>
+                    <div class="difficulty-row">
+                        <span class="difficulty-label">🔥 Hard Problems</span>
+                        <span class="difficulty-value hard">{count['Hard']}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="repo-info">
+                <p>Synced to Repository:</p>
+                <p class="repo-name">{repo_name}</p>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <p style="color: #666; font-size: 14px; text-align: center;">
+                All your LeetCode solutions have been organized and pushed to your GitHub repository. 
+                Check your repository for detailed problem descriptions, solutions, and progress reports.
+            </p>
+            
+            <p class="timestamp">Synced on {current_time}</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>LeetVault</strong> - Automate Your LeetCode Progress Tracking</p>
+            <p>Keep coding, keep growing! 🚀</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+    return html
+
+def send_email(to_email: str, subject: str, html_content: str):
+    """Send email using Gmail SMTP"""
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print("⚠️ Email credentials not configured, skipping email notification")
+        return False
+    
+    try:
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['From'] = GMAIL_USER
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        
+        # Attach HTML content
+        html_part = MIMEText(html_content, 'html')
+        msg.attach(html_part)
+        
+        # Send email
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+            server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+            server.send_message(msg)
+        
+        print(f"✅ Email sent successfully to {to_email}")
+        return True
+    except Exception as e:
+        print(f"❌ Failed to send email to {to_email}: {str(e)}")
+        return False
 
 def generate_leetcode_progress_content(summary: List[Dict], languages: List[str]) -> str:
     """Generate content for LeetcodeProgress.md"""
@@ -555,13 +805,36 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
         )
         
         print(f"  ✅ Successfully synced {problems_created} problems to {repo_full_name}")
-        return {"repo": repo_full_name, "status": "success", "problems": problems_created}
+        
+        # Send email notification to user
+        try:
+            # Get user email from userId
+            user_email = user_id.replace("_", "@", 1).replace("_", ".")
+            
+            # Generate email HTML
+            email_html = generate_email_html(user_email, summary, repo_full_name)
+            
+            # Send email
+            send_email(
+                to_email=user_email,
+                subject=f"🎉 LeetVault Sync Complete - {problems_created} Problems Synced",
+                html_content=email_html
+            )
+        except Exception as email_error:
+            print(f"  ⚠️ Failed to send email notification: {str(email_error)}")
+        
+        return {
+            "repo": repo_full_name, 
+            "status": "success", 
+            "problems": problems_created,
+            "user_email": user_email
+        }
         
     except Exception as e:
         print(f"  ❌ Failed to sync {repo_full_name}: {str(e)}")
         return {"repo": repo_full_name, "status": "failed", "error": str(e)}
 
-async def sync_all_active_repos():
+async def sync_all_active_repos(user_email: Optional[str] = None):
     """Sync all active repositories with LeetCode data in parallel"""
     global fetch_status
     
@@ -572,8 +845,13 @@ async def sync_all_active_repos():
             "last_fetch_time": datetime.now().isoformat()
         })
         
-        # Get ALL active repositories (no user filter)
+        # Get active repositories (optionally filtered by user email)
         queries = [Query.equal("isActive", True)]
+        
+        # If user_email is provided, convert to userId format and filter
+        if user_email:
+            user_id = user_email.replace("@", "_").replace(".", "_")
+            queries.append(Query.equal("userId", user_id))
         
         result = databases.list_documents(
             database_id=APPWRITE_DATABASE_ID,
@@ -582,12 +860,13 @@ async def sync_all_active_repos():
         )
         
         active_repos = result["documents"]
-        print(f"📊 Found {len(active_repos)} active repositories")
+        user_filter_msg = f" for user {user_email}" if user_email else ""
+        print(f"📊 Found {len(active_repos)} active repositories{user_filter_msg}")
         
         if not active_repos:
             fetch_status.update({
                 "status": "completed",
-                "message": "No active repositories found"
+                "message": f"No active repositories found{user_filter_msg}"
             })
             return []
         
@@ -647,22 +926,37 @@ async def sync_all_active_repos():
         print(f"❌ Sync failed: {str(e)}")
         raise
 
+class SyncRequest(BaseModel):
+    user_email: Optional[str] = None
+
 @app.post("/sync")
-async def trigger_sync(background_tasks: BackgroundTasks):
+async def trigger_sync(background_tasks: BackgroundTasks, request: SyncRequest = None):
     """
-    Trigger parallel sync for ALL active repositories
-    This will process all active repos simultaneously for maximum efficiency
+    Trigger parallel sync for active repositories
+    
+    Args:
+        user_email (optional): If provided, syncs only this user's repositories
+                              If omitted, syncs all active repositories
+    
+    This will process repos simultaneously for maximum efficiency
     """
     global fetch_status
 
     if fetch_status["status"] == "running":
         raise HTTPException(status_code=409, detail="Sync already in progress")
 
-    background_tasks.add_task(sync_all_active_repos)
+    user_email = request.user_email if request else None
+    background_tasks.add_task(sync_all_active_repos, user_email)
+
+    if user_email:
+        message = f"Sync started for user {user_email}"
+    else:
+        message = "Parallel sync started for all active repositories"
 
     return {
-        "message": "Parallel sync started for all active repositories",
-        "status": "running"
+        "message": message,
+        "status": "running",
+        "user_email": user_email
     }
 
 @app.get("/status")
@@ -692,9 +986,9 @@ async def main(context):
         )
         
         if is_scheduled:
-            # This is a scheduled cron trigger - run sync directly
+            # This is a scheduled cron trigger - run sync directly for all users
             print("🕐 Scheduled execution triggered by Appwrite cron")
-            results = await sync_all_active_repos()
+            results = await sync_all_active_repos(user_email=None)
             return context.res.json({
                 "scheduled_sync": True,
                 "results": results,

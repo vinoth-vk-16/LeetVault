@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { LogOut, Code2, Home, Settings, Edit2, Save, X, Github, ExternalLink } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_CRUD;
 
 export default function HomePage() {
   const navigate = useNavigate();
