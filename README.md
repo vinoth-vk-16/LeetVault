@@ -161,27 +161,45 @@ python main.py
 
 ### Appwrite Function Deployment
 
-Both backend services use the **standard Appwrite Python function pattern**:
+Both backend services use the **FastAPI with TestClient wrapper pattern** for Appwrite Functions:
 
 ```python
-def main(context):
-    # Direct request handling
-    path = context.req.path
-    method = context.req.method
-    
-    # Route and respond
-    if path == "/health":
-        return context.res.json({"status": "healthy"})
-    
-    # ... more routes
+async def main(context):
+    """Entry point for Appwrite Function"""
+    try:
+        req = context.req
+        path = req.path if hasattr(req, 'path') and req.path else "/"
+        method = (req.method if hasattr(req, 'method') and req.method else "GET").upper()
+        
+        # Parse body using Appwrite's recommended properties
+        body = None
+        if method in ["POST", "PUT", "PATCH"]:
+            if hasattr(req, 'body_json') and req.body_json is not None:
+                body = req.body_json
+            elif hasattr(req, 'body_text') and req.body_text:
+                body = json.loads(req.body_text)
+        
+        # Route through FastAPI TestClient
+        from fastapi.testclient import TestClient
+        client = TestClient(app)
+        
+        if method == "POST":
+            response = client.post(path, json=body)
+        elif method == "GET":
+            response = client.get(path)
+        # ... other methods
+        
+        return context.res.json(response.json())
+    except Exception as e:
+        return context.res.json({"error": str(e)}, 500)
 ```
 
 **Key Points:**
-- ✅ Synchronous `def main(context)` (not `async def`)
-- ✅ Direct use of `context.req` and `context.res`
-- ✅ No FastAPI TestClient wrapper
-- ✅ Use `context.log()` and `context.error()` for logging
-- ✅ Use `asyncio.run()` for async operations within the function
+- ✅ Async `async def main(context)` for event loop support
+- ✅ Use `context.req.body_json` (preferred) or `context.req.body_text`
+- ✅ Route through FastAPI TestClient for proper request handling
+- ✅ Use `await` for async operations (no `asyncio.run()`)
+- ✅ Handle empty request bodies gracefully
 
 ## 📚 Documentation
 
@@ -192,8 +210,8 @@ def main(context):
 ## 🐛 Troubleshooting
 
 ### "request cannot have request body" Error
-- **Cause**: Incorrect Appwrite function wrapper pattern
-- **Solution**: Ensure you're using the standard Appwrite Python function pattern (not FastAPI TestClient)
+- **Cause**: Incorrect body parsing or empty body handling
+- **Solution**: Use `context.req.body_json` (preferred) or check if `body_text` exists before parsing. Always handle empty bodies gracefully.
 
 ### GitHub JWT Errors
 - **Cause**: Incorrect private key format or App ID

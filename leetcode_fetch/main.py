@@ -984,91 +984,72 @@ async def root():
 
 # ---- Appwrite Function Wrapper ----
 async def main(context):
-    """Entry point for Appwrite Function - handles all HTTP requests"""
-    global fetch_status
-    
+    """Entry point for Appwrite Function"""
     try:
-        # Parse incoming request
-        path = context.req.path if context.req.path else "/"
-        method = context.req.method.upper() if context.req.method else "GET"
+        req = context.req
+        path = req.path if hasattr(req, 'path') and req.path else "/"
+        method = (req.method if hasattr(req, 'method') and req.method else "GET").upper()
+        headers = dict(req.headers) if hasattr(req, 'headers') and req.headers else {}
+        query_params = {}
+        if hasattr(req, 'query') and req.query:
+            query_params = dict(req.query)
         
-        context.log(f"📥 Incoming request: {method} {path}")
-        
-        # Parse request body for POST requests
-        body_data = None
-        if method == "POST":
+        # Get request body - only for methods that typically have bodies
+        body = None
+        if method in ["POST", "PUT", "PATCH"]:
             try:
-                # Check if body_text exists and is not empty before parsing
-                if context.req.body_text and context.req.body_text.strip():
-                    body_data = json.loads(context.req.body_text)
-                    context.log(f"📦 Request body: {body_data}")
-                else:
-                    # Empty body is OK for POST requests
-                    body_data = {}
-                    context.log("📦 Empty request body")
-            except (json.JSONDecodeError, AttributeError) as e:
-                context.log(f"⚠️  Failed to parse JSON body: {str(e)}")
-                body_data = {}
+                # Try body_json first (parsed JSON, recommended by Appwrite)
+                if hasattr(req, 'body_json') and req.body_json is not None:
+                    body = req.body_json
+                # Fallback to body_text for text data
+                elif hasattr(req, 'body_text') and req.body_text:
+                    try:
+                        body = json.loads(req.body_text)
+                    except (json.JSONDecodeError, ValueError):
+                        body = req.body_text
+                # For binary data
+                elif hasattr(req, 'body_binary') and req.body_binary:
+                    body = req.body_binary
+            except Exception:
+                pass
         
-        # Route to appropriate handler
-        if path == "/" and method == "GET":
-            return context.res.json({
-                "service": "LeetCode Fetch Service",
-                "version": "1.0.0",
-                "endpoints": {
-                    "POST /sync": "Trigger sync (optionally with user_email)",
-                    "GET /status": "Get sync status",
-                    "GET /health": "Health check"
-                }
-            })
+        from fastapi.testclient import TestClient
+        client = TestClient(app)
         
-        elif path == "/health" and method == "GET":
-            return context.res.json({
-                "status": "healthy",
-                "service": "LeetCode Fetch Service"
-            })
-        
-        elif path == "/status" and method == "GET":
-            return context.res.json(fetch_status)
-        
-        elif path == "/sync" and method == "POST":
-            if fetch_status["status"] == "running":
-                return context.res.json({
-                    "error": "Sync already in progress"
-                }, 409)
-            
-            user_email = body_data.get("user_email") if body_data else None
-            
-            # Run sync directly (Appwrite already provides event loop)
-            results = await sync_all_active_repos(user_email)
-            
-            if user_email:
-                message = f"Sync completed for user {user_email}"
+        if method == "GET":
+            response = client.get(path, params=query_params, headers=headers)
+        elif method == "POST":
+            if isinstance(body, bytes):
+                response = client.post(path, content=body, params=query_params, headers=headers)
             else:
-                message = "Parallel sync completed for all active repositories"
-            
-            return context.res.json({
-                "message": message,
-                "status": "completed",
-                "results": results,
-                "user_email": user_email
-            })
-        
+                response = client.post(path, json=body, params=query_params, headers=headers)
+        elif method == "PUT":
+            if isinstance(body, bytes):
+                response = client.put(path, content=body, params=query_params, headers=headers)
+            else:
+                response = client.put(path, json=body, params=query_params, headers=headers)
+        elif method == "DELETE":
+            response = client.delete(path, params=query_params, headers=headers)
         else:
-            return context.res.json({
-                "error": "Not Found",
-                "path": path,
-                "method": method
-            }, 404)
+            if isinstance(body, bytes):
+                response = client.request(method, path, content=body, params=query_params, headers=headers)
+            else:
+                response = client.request(method, path, json=body, params=query_params, headers=headers)
+        
+        status_code = response.status_code
+        response_headers = dict(response.headers)
+        content_type = response.headers.get("content-type", "")
+        
+        if "application/json" in content_type:
+            return context.res.json(response.json(), status_code, response_headers)
+        else:
+            return context.res.text(response.text, status_code, response_headers)
         
     except Exception as e:
-        context.error(f"❌ Function Error: {str(e)}")
+        print(f"❌ Appwrite Function Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return context.res.json({
-            "error": str(e),
-            "status": "error"
-        }, 500)
+        return context.res.json({"error": str(e), "status": "error"}, 500)
 
 if __name__ == "__main__":
     import uvicorn
