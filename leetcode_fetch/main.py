@@ -985,6 +985,8 @@ async def root():
 # ---- Appwrite Function Wrapper ----
 def main(context):
     """Entry point for Appwrite Function - handles all HTTP requests"""
+    global fetch_status
+    
     try:
         # Parse incoming request
         path = context.req.path if context.req.path else "/"
@@ -1024,8 +1026,6 @@ def main(context):
             return context.res.json(fetch_status)
         
         elif path == "/sync" and method == "POST":
-            global fetch_status
-            
             if fetch_status["status"] == "running":
                 return context.res.json({
                     "error": "Sync already in progress"
