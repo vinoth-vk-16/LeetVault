@@ -983,7 +983,7 @@ async def root():
     }
 
 # ---- Appwrite Function Wrapper ----
-def main(context):
+async def main(context):
     """Entry point for Appwrite Function - handles all HTTP requests"""
     global fetch_status
     
@@ -1033,9 +1033,8 @@ def main(context):
             
             user_email = body_data.get("user_email") if body_data else None
             
-            # Run sync directly (no background tasks in Appwrite functions)
-            import asyncio
-            results = asyncio.run(sync_all_active_repos(user_email))
+            # Run sync directly (Appwrite already provides event loop)
+            results = await sync_all_active_repos(user_email)
             
             if user_email:
                 message = f"Sync completed for user {user_email}"
