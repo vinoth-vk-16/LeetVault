@@ -384,8 +384,8 @@ def generate_problem_files_content(summary: List[Dict], languages: List[str]) ->
             for i, item in enumerate(sorted(problems, key=lambda x: x["title"]), 1):
                 slug = item["slug"]
                 title = item["title"]
-                url = f"./leetcode/{slug}"
-                content += f"| {i} | {title} | [Link]({url}) |\n"
+            url = f"./leetcode/{slug}"
+            content += f"| {i} | {title} | [Link]({url}) |\n"
             
             content += "\n---\n\n*Back to [LeetCode Progress](./LeetcodeProgress.md)*\n"
             files_content[f"{difficulty.lower()}-problems.md"] = content
@@ -993,7 +993,7 @@ async def main(context):
         query_params = {}
         if hasattr(req, 'query') and req.query:
             query_params = dict(req.query)
-        
+
         # Get request body - only for methods that typically have bodies
         body = None
         if method in ["POST", "PUT", "PATCH"]:
@@ -1012,10 +1012,10 @@ async def main(context):
                     body = req.body_binary
             except Exception:
                 pass
-        
+
         from fastapi.testclient import TestClient
         client = TestClient(app)
-        
+
         if method == "GET":
             response = client.get(path, params=query_params, headers=headers)
         elif method == "POST":
@@ -1035,16 +1035,16 @@ async def main(context):
                 response = client.request(method, path, content=body, params=query_params, headers=headers)
             else:
                 response = client.request(method, path, json=body, params=query_params, headers=headers)
-        
+
         status_code = response.status_code
         response_headers = dict(response.headers)
         content_type = response.headers.get("content-type", "")
-        
+
         if "application/json" in content_type:
             return context.res.json(response.json(), status_code, response_headers)
         else:
             return context.res.text(response.text, status_code, response_headers)
-        
+
     except Exception as e:
         print(f"❌ Appwrite Function Error: {str(e)}")
         import traceback
