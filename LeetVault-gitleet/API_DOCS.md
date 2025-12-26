@@ -84,7 +84,7 @@ Check if user exists, create if not. Returns complete user status including GitH
 
 **Curl Command:**
 ```bash
-curl -X POST "http://69481ac30014e1672988.sgp.appwrite.run/api/users/check" \
+curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/users/check" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 ```
