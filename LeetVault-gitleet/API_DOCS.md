@@ -4,7 +4,7 @@ Complete API reference with request/response structures and curl commands.
 
 ## Base URL
 ```
-http://localhost:8000
+https://69481ac30014e1672988.sgp.appwrite.run
 ```
 
 ## Quick Start
@@ -16,12 +16,10 @@ python main.py
 
 2. **Test Health**
 ```bash
-curl http://localhost:8000/health
+curl https://69481ac30014e1672988.sgp.appwrite.run/health
 ```
 
-3. **Interactive Docs**
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+3. **Note**: Interactive docs (Swagger UI/ReDoc) are not available in Appwrite Functions deployment
 
 ---
 
@@ -86,7 +84,7 @@ Check if user exists, create if not. Returns complete user status including GitH
 
 **Curl Command:**
 ```bash
-curl -X POST "http://localhost:8000/api/users/check" \
+curl -X POST "http://69481ac30014e1672988.sgp.appwrite.run/api/users/check" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 ```
@@ -124,7 +122,7 @@ Get user information by email.
 
 **Curl Command:**
 ```bash
-curl "http://localhost:8000/api/users/user@example.com"
+curl "https://69481ac30014e1672988.sgp.appwrite.run/api/users/user@example.com"
 ```
 
 ---
@@ -189,7 +187,7 @@ Store or update LeetCode credentials for a user. User must exist before storing 
 
 **Curl Command:**
 ```bash
-curl -X POST "http://localhost:8000/api/leetcode/credentials" \
+curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/leetcode/credentials" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -231,7 +229,7 @@ Get LeetCode credentials for a user by email.
 
 **Curl Command:**
 ```bash
-curl "http://localhost:8000/api/leetcode/credentials/user@example.com"
+curl "https://69481ac30014e1672988.sgp.appwrite.run/api/leetcode/credentials/user@example.com"
 ```
 
 ---

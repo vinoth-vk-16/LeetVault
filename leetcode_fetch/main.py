@@ -984,73 +984,86 @@ async def root():
 
 # ---- Appwrite Function Wrapper ----
 def main(context):
-    """Entry point for Appwrite Function"""
+    """Entry point for Appwrite Function - handles all HTTP requests"""
     try:
-        # Extract request information from Appwrite context
-        path = context.req.path if hasattr(context.req, 'path') else "/"
-        method = context.req.method if hasattr(context.req, 'method') else "GET"
-        headers = dict(context.req.headers) if hasattr(context.req, 'headers') else {}
-        query_params = dict(context.req.query) if hasattr(context.req, 'query') else {}
+        # Parse incoming request
+        path = context.req.path if context.req.path else "/"
+        method = context.req.method.upper() if context.req.method else "GET"
         
-        # Get request body
-        body = None
-        if method in ["POST", "PUT", "PATCH"]:
+        context.log(f"📥 Incoming request: {method} {path}")
+        
+        # Parse request body for POST requests
+        body_data = None
+        if method == "POST":
             try:
-                # Try body_json first (parsed JSON)
-                if hasattr(context.req, 'body_json') and context.req.body_json is not None:
-                    body = context.req.body_json
-                # Fallback to body_text
-                elif hasattr(context.req, 'body_text') and context.req.body_text:
-                    try:
-                        body = json.loads(context.req.body_text)
-                    except (json.JSONDecodeError, ValueError):
-                        body = context.req.body_text
-                # For binary data
-                elif hasattr(context.req, 'body_binary') and context.req.body_binary:
-                    body = context.req.body_binary
-            except Exception:
-                pass
+                if context.req.body_text:
+                    body_data = json.loads(context.req.body_text)
+                    context.log(f"📦 Request body: {body_data}")
+            except (json.JSONDecodeError, AttributeError):
+                context.log("⚠️  No valid JSON body found")
         
-        # Use FastAPI TestClient to route requests
-        from fastapi.testclient import TestClient
-        client = TestClient(app)
+        # Route to appropriate handler
+        if path == "/" and method == "GET":
+            return context.res.json({
+                "service": "LeetCode Fetch Service",
+                "version": "1.0.0",
+                "endpoints": {
+                    "POST /sync": "Trigger sync (optionally with user_email)",
+                    "GET /status": "Get sync status",
+                    "GET /health": "Health check"
+                }
+            })
         
-        # Make request to FastAPI app
-        if method == "GET":
-            response = client.get(path, params=query_params, headers=headers)
-        elif method == "POST":
-            if isinstance(body, bytes):
-                response = client.post(path, content=body, params=query_params, headers=headers)
+        elif path == "/health" and method == "GET":
+            return context.res.json({
+                "status": "healthy",
+                "service": "LeetCode Fetch Service"
+            })
+        
+        elif path == "/status" and method == "GET":
+            return context.res.json(fetch_status)
+        
+        elif path == "/sync" and method == "POST":
+            global fetch_status
+            
+            if fetch_status["status"] == "running":
+                return context.res.json({
+                    "error": "Sync already in progress"
+                }, 409)
+            
+            user_email = body_data.get("user_email") if body_data else None
+            
+            # Run sync directly (no background tasks in Appwrite functions)
+            import asyncio
+            results = asyncio.run(sync_all_active_repos(user_email))
+            
+            if user_email:
+                message = f"Sync completed for user {user_email}"
             else:
-                response = client.post(path, json=body, params=query_params, headers=headers)
-        elif method == "PUT":
-            if isinstance(body, bytes):
-                response = client.put(path, content=body, params=query_params, headers=headers)
-            else:
-                response = client.put(path, json=body, params=query_params, headers=headers)
-        elif method == "DELETE":
-            response = client.delete(path, params=query_params, headers=headers)
+                message = "Parallel sync completed for all active repositories"
+            
+            return context.res.json({
+                "message": message,
+                "status": "completed",
+                "results": results,
+                "user_email": user_email
+            })
+        
         else:
-            if isinstance(body, bytes):
-                response = client.request(method, path, content=body, params=query_params, headers=headers)
-            else:
-                response = client.request(method, path, json=body, params=query_params, headers=headers)
-        
-        # Return response using Appwrite context
-        status_code = response.status_code
-        response_headers = dict(response.headers)
-        content_type = response.headers.get("content-type", "")
-        
-        if "application/json" in content_type:
-            return context.res.json(response.json())
-        else:
-            return context.res.text(response.text)
+            return context.res.json({
+                "error": "Not Found",
+                "path": path,
+                "method": method
+            }, 404)
         
     except Exception as e:
-        context.error(f"Appwrite Function Error: {str(e)}")
+        context.error(f"❌ Function Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return context.res.json({"error": str(e), "status": "error"})
+        return context.res.json({
+            "error": str(e),
+            "status": "error"
+        }, 500)
 
 if __name__ == "__main__":
     import uvicorn

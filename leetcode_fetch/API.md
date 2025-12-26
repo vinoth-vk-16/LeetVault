@@ -3,7 +3,7 @@
 ## Base URL
 
 ```
-https://your-appwrite-function-url.appwrite.run
+https://69481b400019e83f08ad.sgp.appwrite.run
 ```
 
 ---
@@ -27,7 +27,7 @@ Trigger parallel sync for active repositories.
 
 **Sync All Users:**
 ```bash
-curl -X POST https://your-function-url/sync \
+curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync \
   -H "Content-Type: application/json"
 ```
 
@@ -81,7 +81,7 @@ Get current sync status and statistics.
 
 **Request**:
 ```bash
-curl https://your-function-url/status
+curl https://69481b400019e83f08ad.sgp.appwrite.run/status
 ```
 
 **Response** (200 OK):
@@ -316,7 +316,7 @@ Poll the `/status` endpoint:
 
 ```bash
 while true; do
-  curl -s https://your-function-url/status | jq '.status, .message'
+  curl -s https://69481b400019e83f08ad.sgp.appwrite.run/status | jq '.status, .message'
   sleep 5
 done
 ```
@@ -392,13 +392,13 @@ Check **Appwrite Console** → Your Function → **Executions** to see scheduled
 
 ```bash
 # Trigger sync
-curl -X POST https://your-function-url/sync
+curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync
 
 # Wait a few seconds
 sleep 10
 
 # Check status
-curl https://your-function-url/status
+curl https://69481b400019e83f08ad.sgp.appwrite.run/status
 ```
 
 ### Test with Multiple Users

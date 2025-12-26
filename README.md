@@ -1,68 +1,58 @@
 # LeetVault
 
-> Automate your LeetCode progress tracking with seamless GitHub integration
-
-LeetVault is a full-stack application that automatically syncs your LeetCode submissions to GitHub repositories, providing beautiful progress tracking and organized code storage.
-
-## 🚀 Features
-
-- **🔐 Google Authentication**: Secure login with Firebase
-- **🐙 GitHub Integration**: Connect repositories via GitHub App
-- **📊 Automatic Sync**: Parallel processing for 1000+ users simultaneously
-- **📈 Progress Tracking**: Beautiful markdown reports with statistics
-- **🗂️ Organized Structure**: Problems organized by difficulty and topic
-- **⚡ High Performance**: Async/parallel processing for maximum efficiency
-- **🎨 Modern UI**: Dark theme with animated backgrounds
-- **🔄 Auto-Refresh**: Expired LeetCode sessions automatically refreshed
+Automate your LeetCode progress tracking with GitHub integration.
 
 ## 📁 Project Structure
 
 ```
 leetvault/
-├── leetVault-fe/           # React frontend (Vite + Tailwind)
-├── LeetVault-gitleet/      # GitHub integration API (FastAPI)
-├── leetcode_fetch/         # LeetCode sync service (FastAPI)
-├── DEPLOYMENT.md           # Deployment guide
-└── README.md               # This file
+├── leetVault-fe/          # React frontend (Vite + Tailwind CSS)
+├── LeetVault-gitleet/     # GitHub integration service (Appwrite Function)
+├── leetcode_fetch/        # LeetCode sync service (Appwrite Function)
+└── README.md             # This file
 ```
 
-## 🏗️ Architecture
+## 🚀 Services
 
-### Frontend (React + Vite)
-- Modern React 19 with Vite
-- Firebase Authentication (Google Sign-In)
-- Tailwind CSS for styling
-- WebGL animated backgrounds
-- React Router for navigation
+### 1. Frontend (`leetVault-fe`)
+- **Tech Stack**: React.js, Vite, Tailwind CSS, Firebase Auth
+- **Features**:
+  - Google Sign-In with Firebase
+  - LeetCode credentials management
+  - GitHub App installation and repository activation
+  - Modern dark-themed UI
 
-### Backend Services
+### 2. GitHub Integration (`LeetVault-gitleet`)
+- **Tech Stack**: FastAPI, Appwrite SDK, PyJWT
+- **Deployment**: Appwrite Function
+- **Features**:
+  - User management with email-based IDs
+  - GitHub App OAuth flow handling
+  - Repository activation/deactivation
+  - LeetCode credentials storage
+  - JWT-based GitHub App authentication
 
-#### 1. LeetVault-gitleet (GitHub Integration)
-- FastAPI backend
-- GitHub App OAuth flow
-- Repository management
-- User authentication
-- LeetCode credentials storage
+### 3. LeetCode Sync (`leetcode_fetch`)
+- **Tech Stack**: FastAPI, Appwrite SDK, Requests, html2text
+- **Deployment**: Appwrite Function with scheduled execution
+- **Features**:
+  - Parallel repository syncing
+  - Automatic LeetCode session refresh
+  - GitHub file creation/updates
+  - Email notifications with progress reports
+  - User-specific or all-user sync modes
 
-#### 2. leetcode_fetch (Sync Service)
-- **Appwrite Scheduled Execution**: Automatically triggered by Appwrite cron (daily at 6:20 PM UTC)
-- **Parallel Processing**: Syncs ALL active repos simultaneously
-- Fetches LeetCode submissions via GraphQL
-- Pushes to GitHub repositories
-- Auto-refreshes expired sessions
-- Scalable to 1000+ users
-
-## 🚀 Quick Start
+## 🔧 Setup
 
 ### Prerequisites
+- Node.js 18+ (for frontend)
+- Python 3.12+ (for backend services)
+- Firebase project with Google Auth enabled
+- GitHub App with Contents: Read & Write permission
+- Appwrite Cloud account or self-hosted instance
+- Gmail account with App Password (for email notifications)
 
-- Node.js 18+
-- Python 3.9+
-- Appwrite account
-- Firebase project
-- GitHub App
-
-### 1. Frontend Setup
+### Frontend Setup
 
 ```bash
 cd leetVault-fe
@@ -72,171 +62,155 @@ cp env.example .env
 npm run dev
 ```
 
-### 2. Backend Setup
+### Backend Services Setup
 
-Both backend services use Appwrite Functions:
+Both backend services are deployed as Appwrite Functions.
 
-```bash
-# LeetVault-gitleet
-cd LeetVault-gitleet
-pip install -r requirements.txt
-# Configure .env with Appwrite & GitHub credentials
-# Deploy to Appwrite Functions
+#### LeetVault-gitleet (GitHub Integration)
 
-# leetcode_fetch
-cd leetcode_fetch
-pip install -r requirements.txt
-# Configure .env with Appwrite & GitHub credentials
-# Deploy to Appwrite Functions
-```
+1. Create an Appwrite Function in your project
+2. Configure environment variables:
+   ```
+   APPWRITE_ENDPOINT=https://sgp.cloud.appwrite.io/v1
+   APPWRITE_PROJECT_ID=your_project_id
+   APPWRITE_API_KEY=your_api_key
+   APPWRITE_DATABASE_ID=your_database_id
+   FRONTEND_URL=https://your-frontend-url.com
+   GITHUB_APP_ID=your_github_app_id
+   GITHUB_PRIVATE_KEY_PATH=your_github_private_key
+   ```
+3. Deploy the function from `LeetVault-gitleet/` directory
+4. Set entrypoint to `main.py`
+5. Build command: `pip install -r requirements.txt`
 
-## 📖 Documentation
+#### leetcode_fetch (LeetCode Sync)
 
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Complete deployment guide
-- **[leetVault-fe/README.md](./leetVault-fe/README.md)** - Frontend documentation
-- **[leetcode_fetch/README.md](./leetcode_fetch/README.md)** - Sync service documentation
-- **[LeetVault-gitleet/API_DOCS.md](./LeetVault-gitleet/API_DOCS.md)** - API documentation
+1. Create an Appwrite Function in your project
+2. Configure environment variables:
+   ```
+   APPWRITE_ENDPOINT=https://sgp.cloud.appwrite.io/v1
+   APPWRITE_PROJECT_ID=your_project_id
+   APPWRITE_API_KEY=your_api_key
+   APPWRITE_DATABASE_ID=your_database_id
+   GITHUB_APP_ID=your_github_app_id
+   GITHUB_PRIVATE_KEY_PATH=your_github_private_key
+   GMAIL_USER=your_gmail@gmail.com
+   GMAIL_APP_PASSWORD=your_app_password
+   ```
+3. Deploy the function from `leetcode_fetch/` directory
+4. Set entrypoint to `main.py`
+5. Build command: `pip install -r requirements.txt`
+6. Configure schedule: `0 18 * * *` (daily at 6 PM UTC)
+
+## 📊 Database Schema
+
+### Collections
+
+1. **users** (`694101bf003792f1a56b`)
+   - email, name, Github_status, Repo_activation, createdAt, updatedAt
+
+2. **github_installations** (`694101cf003c5c9bba86`)
+   - userId, githubInstallationId, isActive, installedAt, updatedAt
+
+3. **activated_repos** (`694101df002d9f1c8ed3`)
+   - userId, installationId, repoFullName, defaultBranch, isActive, activatedAt, lastSyncAt, updatedAt
+
+4. **leetcode_credentials** (`694101f900308ac95c21`)
+   - userId, sessionCookie, csrfToken, leetcodeUsername, isValid, lastValidatedAt, createdAt, updatedAt
+
+5. **sync_logs** (`6941020f001a701ab9ae`)
+   - userId, repoId, status, problemsSynced, syncedAt, errorMessage
 
 ## 🔄 How It Works
 
-### User Flow
+1. **User Authentication**: Users sign in with Google via Firebase
+2. **LeetCode Setup**: Users provide their LeetCode session cookie and CSRF token
+3. **GitHub Connection**: Users install the LeetVault GitHub App and select repositories
+4. **Repository Activation**: Users activate one repository for syncing
+5. **Automatic Sync**: The `leetcode_fetch` service runs daily (or on-demand) to:
+   - Fetch all accepted LeetCode submissions
+   - Create/update problem folders with solutions
+   - Generate progress reports (`LeetcodeProgress.md`, `easy-problems.md`, etc.)
+   - Push changes to GitHub
+   - Send email notifications to users
 
-1. **Sign Up**: User signs in with Google
-2. **Connect GitHub**: Install LeetVault GitHub App
-3. **Select Repository**: Choose a repo to sync
-4. **Add LeetCode Credentials**: Provide session cookie & CSRF token
-5. **Automatic Sync**: Appwrite scheduler triggers sync daily at 6:20 PM UTC
+## 📧 Email Notifications
 
-### Sync Process (Scheduled & Parallel)
+After each successful sync, users receive an HTML email with:
+- Total problems synced
+- Breakdown by difficulty (Easy, Medium, Hard)
+- Repository name
+- Sync timestamp
+- LeetVault branding
 
-```
-Appwrite Scheduler (Daily at 6:20 PM UTC)
-    ↓
-Detect Scheduled Execution
-    ↓
-Fetch ALL Active Repos (from Appwrite)
-    ↓
-Create Tasks for Each Repo
-    ↓
-Execute in Parallel (asyncio.gather)
-    ↓
-For Each Repo (concurrent):
-    - Fetch LeetCode submissions
-    - Generate markdown files
-    - Push to GitHub
-    - Update database
-    ↓
-Return Results
-```
+## 🛠️ Development
 
-**Manual Trigger**: Also available via `/sync` endpoint for immediate sync.
+### Local Testing
 
-### Performance
-
-| Users | Time (Parallel) | Speed vs Sequential |
-|-------|----------------|---------------------|
-| 1     | ~5-10s         | 1x                  |
-| 100   | ~5-15s         | 100x                |
-| 1000  | ~10-20s        | 500x+               |
-
-## 📊 Repository Structure (Generated)
-
-When synced, your GitHub repository will contain:
-
-```
-your-repo/
-├── LeetcodeProgress.md           # Main progress report
-├── easy-problems.md              # All easy problems
-├── medium-problems.md            # All medium problems
-├── hard-problems.md              # All hard problems
-└── leetcode/
-    ├── two-sum/
-    │   ├── README.md             # Problem description
-    │   └── solution.py           # Your solution
-    ├── reverse-linked-list/
-    │   ├── README.md
-    │   └── solution.cpp
-    └── ...
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-#### Frontend (.env)
-```env
-VITE_FIREBASE_API_KEY=your_key
-VITE_FIREBASE_AUTH_DOMAIN=your_domain
-VITE_FIREBASE_PROJECT_ID=your_project
-VITE_FIREBASE_STORAGE_BUCKET=your_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-```
-
-#### Backend Services (.env)
-```env
-APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-APPWRITE_PROJECT_ID=your_project_id
-APPWRITE_API_KEY=your_api_key
-APPWRITE_DATABASE_ID=your_database_id
-GITHUB_APP_ID=your_app_id
-GITHUB_PRIVATE_KEY_PATH="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-FRONTEND_URL=https://your-frontend.com
-```
-
-## 🎯 API Endpoints
-
-### LeetVault-gitleet
-- `POST /api/users/check` - Check/create user
-- `GET /api/auth/github-install/{email}` - Get GitHub install URL
-- `GET /api/auth/github/callback` - Handle GitHub callback
-- `GET /api/github/installations/{id}/repositories` - List repos
-- `POST /api/repos/activate` - Activate repository
-- `DELETE /api/repos/deactivate/{email}` - Deactivate repository
-- `POST /api/leetcode/credentials` - Save credentials
-- `GET /api/leetcode/credentials/{email}` - Get credentials
-
-### leetcode_fetch
-- `POST /sync` - Trigger parallel sync for all active repos
-- `GET /status` - Get sync status
-- `GET /health` - Health check
-
-## 🔐 Security
-
-- Firebase Authentication for user management
-- GitHub App for secure repository access
-- Appwrite for encrypted data storage
-- Environment variables for sensitive data
-- CORS configuration for API security
-
-## 📈 Monitoring
-
-Check sync status:
+**Frontend:**
 ```bash
-curl https://your-function-url/status
+cd leetVault-fe
+npm run dev
 ```
 
-Response:
-```json
-{
-  "status": "completed",
-  "message": "Synced 950/1000 repositories with 4523 problems",
-  "last_fetch_time": "2025-12-22T12:00:00",
-  "problems_processed": 4523
-}
+**Backend Services:**
+```bash
+cd LeetVault-gitleet  # or leetcode_fetch
+python main.py
 ```
+
+### Appwrite Function Deployment
+
+Both backend services use the **standard Appwrite Python function pattern**:
+
+```python
+def main(context):
+    # Direct request handling
+    path = context.req.path
+    method = context.req.method
+    
+    # Route and respond
+    if path == "/health":
+        return context.res.json({"status": "healthy"})
+    
+    # ... more routes
+```
+
+**Key Points:**
+- ✅ Synchronous `def main(context)` (not `async def`)
+- ✅ Direct use of `context.req` and `context.res`
+- ✅ No FastAPI TestClient wrapper
+- ✅ Use `context.log()` and `context.error()` for logging
+- ✅ Use `asyncio.run()` for async operations within the function
+
+## 📚 Documentation
+
+- [Frontend README](./leetVault-fe/README.md)
+- [GitHub Integration API Docs](./LeetVault-gitleet/API_DOCS.md)
+- [LeetCode Sync API Docs](./leetcode_fetch/API.md)
+
+## 🐛 Troubleshooting
+
+### "request cannot have request body" Error
+- **Cause**: Incorrect Appwrite function wrapper pattern
+- **Solution**: Ensure you're using the standard Appwrite Python function pattern (not FastAPI TestClient)
+
+### GitHub JWT Errors
+- **Cause**: Incorrect private key format or App ID
+- **Solution**: Verify GitHub App ID and regenerate private key with proper newline formatting
+
+### Email Not Sending
+- **Cause**: Missing or incorrect Gmail credentials
+- **Solution**: Verify `GMAIL_USER` and `GMAIL_APP_PASSWORD` environment variables
+
+### LeetCode Session Expired
+- **Cause**: Session cookie is invalid
+- **Solution**: The service will automatically attempt to refresh using CSRF token. If that fails, user needs to update credentials.
+
+## 📝 License
+
+This project is for educational purposes.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-MIT
-
-## 🙏 Acknowledgments
-
-- LeetCode for the amazing platform
-- GitHub for the powerful API
-- Appwrite for the backend infrastructure
-- Firebase for authentication services
+This is a personal project. Feel free to fork and modify for your own use.
