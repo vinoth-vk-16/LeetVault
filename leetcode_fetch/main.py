@@ -998,11 +998,17 @@ async def main(context):
         body_data = None
         if method == "POST":
             try:
-                if context.req.body_text:
+                # Check if body_text exists and is not empty before parsing
+                if context.req.body_text and context.req.body_text.strip():
                     body_data = json.loads(context.req.body_text)
                     context.log(f"📦 Request body: {body_data}")
-            except (json.JSONDecodeError, AttributeError):
-                context.log("⚠️  No valid JSON body found")
+                else:
+                    # Empty body is OK for POST requests
+                    body_data = {}
+                    context.log("📦 Empty request body")
+            except (json.JSONDecodeError, AttributeError) as e:
+                context.log(f"⚠️  Failed to parse JSON body: {str(e)}")
+                body_data = {}
         
         # Route to appropriate handler
         if path == "/" and method == "GET":
