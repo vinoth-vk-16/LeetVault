@@ -19,6 +19,7 @@ from typing import Optional, Dict, Any
 import httpx
 import jwt
 import time
+import json
 
 # Load environment variables
 load_dotenv()
@@ -1044,6 +1045,77 @@ async def health_check():
             "error": str(e),
             "timestamp": get_current_timestamp()
         }
+
+# ---- Appwrite Function Wrapper ----
+async def main(context):
+    """Entry point for Appwrite Function"""
+    try:
+        req = context.req
+        path = req.path if hasattr(req, 'path') and req.path else "/"
+        method = (req.method if hasattr(req, 'method') and req.method else "GET").upper()
+        headers = dict(req.headers) if hasattr(req, 'headers') and req.headers else {}
+        query_params = {}
+        if hasattr(req, 'query') and req.query:
+            query_params = dict(req.query)
+        
+        # Get request body - only for methods that typically have bodies
+        # Use Appwrite's recommended body properties: body_text, body_json, body_binary
+        body = None
+        if method in ["POST", "PUT", "PATCH"]:
+            try:
+                # Try body_json first (parsed JSON, recommended by Appwrite)
+                if hasattr(req, 'body_json') and req.body_json is not None:
+                    body = req.body_json
+                # Fallback to body_text for text data
+                elif hasattr(req, 'body_text') and req.body_text:
+                    try:
+                        body = json.loads(req.body_text)
+                    except (json.JSONDecodeError, ValueError):
+                        body = req.body_text
+                # For binary data
+                elif hasattr(req, 'body_binary') and req.body_binary:
+                    body = req.body_binary
+            except Exception:
+                pass
+        
+        from fastapi.testclient import TestClient
+        client = TestClient(app)
+        
+        if method == "GET":
+            response = client.get(path, params=query_params, headers=headers)
+        elif method == "POST":
+            if isinstance(body, bytes):
+                response = client.post(path, content=body, params=query_params, headers=headers)
+            else:
+                response = client.post(path, json=body, params=query_params, headers=headers)
+        elif method == "PUT":
+            if isinstance(body, bytes):
+                response = client.put(path, content=body, params=query_params, headers=headers)
+            else:
+                response = client.put(path, json=body, params=query_params, headers=headers)
+        elif method == "DELETE":
+            response = client.delete(path, params=query_params, headers=headers)
+        else:
+            if isinstance(body, bytes):
+                response = client.request(method, path, content=body, params=query_params, headers=headers)
+            else:
+                response = client.request(method, path, json=body, params=query_params, headers=headers)
+        
+        status_code = response.status_code
+        response_headers = dict(response.headers)
+        content_type = response.headers.get("content-type", "")
+        
+        if "application/json" in content_type:
+            return context.res.json(response.json(), status_code, response_headers)
+        else:
+            return context.res.text(response.text, status_code, response_headers)
+        
+    except Exception as e:
+        print(f"❌ Appwrite Function Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return context.res.json({"error": str(e), "status": "error"}, 500)
+
 
 if __name__ == "__main__":
     import uvicorn
