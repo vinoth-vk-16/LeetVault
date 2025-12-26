@@ -83,6 +83,23 @@ Health check endpoint.
 }
 ```
 
+### GET `/`
+
+Root endpoint with service information.
+
+**Response:**
+```json
+{
+  "service": "LeetCode Fetch Service",
+  "version": "1.0.0",
+  "endpoints": {
+    "POST /sync": "Trigger sync (optionally with user_email)",
+    "GET /status": "Get sync status",
+    "GET /health": "Health check"
+  }
+}
+```
+
 ## ⚙️ Appwrite Function Configuration
 
 ### Function Settings
@@ -96,7 +113,11 @@ Health check endpoint.
 | Timeout (Seconds) | 900 (15 minutes)                  |
 | Execute Access    | `any` or `users`                  |
 
-### Schedule Configuration
+### Schedule Configuration (Optional)
+
+To enable automatic scheduled syncing, configure in Appwrite Console:
+
+**Appwrite Console → Functions → Your Function → Settings → Schedule**
 
 | Setting           | Value                             |
 | ----------------- | --------------------------------- |
@@ -108,6 +129,11 @@ Health check endpoint.
 - `0 */6 * * *` - Every 6 hours
 - `0 0,12 * * *` - Twice daily (midnight and noon)
 - `0 2 * * *` - Daily at 2:00 AM UTC
+
+**How it works:**
+- Appwrite scheduler directly calls the `main()` function
+- No HTTP endpoint needed - it's a direct function invocation
+- The function will automatically sync all active repositories
 
 ## 🔒 Environment Variables
 

@@ -398,7 +398,7 @@ def generate_email_html(user_email: str, summary: List[Dict], repo_name: str) ->
     count = {"Easy": 0, "Medium": 0, "Hard": 0}
     for item in summary:
         count[item["difficulty"]] += 1
-    
+
     current_time = datetime.now().strftime("%B %d, %Y at %I:%M %p UTC")
     
     html = f"""
@@ -969,57 +969,53 @@ async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "LeetCode Fetch Service"}
 
+@app.get("/")
+async def root():
+    """Root endpoint"""
+    return {
+        "service": "LeetCode Fetch Service",
+        "version": "1.0.0",
+        "endpoints": {
+            "POST /sync": "Trigger sync (optionally with user_email)",
+            "GET /status": "Get sync status",
+            "GET /health": "Health check"
+        }
+    }
+
 # ---- Appwrite Function Wrapper ----
-async def main(context):
+def main(context):
     """Entry point for Appwrite Function"""
     try:
-        req = context.req
-        path = req.path if hasattr(req, 'path') and req.path else "/"
-        method = (req.method if hasattr(req, 'method') and req.method else "GET").upper()
+        # Extract request information from Appwrite context
+        path = context.req.path if hasattr(context.req, 'path') else "/"
+        method = context.req.method if hasattr(context.req, 'method') else "GET"
+        headers = dict(context.req.headers) if hasattr(context.req, 'headers') else {}
+        query_params = dict(context.req.query) if hasattr(context.req, 'query') else {}
         
-        # ✅ DETECT SCHEDULED EXECUTION (no real HTTP request)
-        # When Appwrite schedule triggers, there's no proper path/headers
-        is_scheduled = (
-            path == "/" and 
-            method == "GET" and 
-            (not hasattr(req, 'headers') or not req.headers or len(dict(req.headers)) == 0)
-        )
-        
-        if is_scheduled:
-            # This is a scheduled cron trigger - run sync directly for all users
-            print("🕐 Scheduled execution triggered by Appwrite cron")
-            results = await sync_all_active_repos(user_email=None)
-            return context.res.json({
-                "scheduled_sync": True,
-                "results": results,
-                "executed_at": datetime.now().isoformat(),
-                "message": "Scheduled sync completed successfully"
-            })
-        
-        # ✅ NORMAL HTTP REQUEST HANDLING
-        headers = dict(req.headers) if hasattr(req, 'headers') and req.headers else {}
-        query_params = {}
-        if hasattr(req, 'query') and req.query:
-            query_params = dict(req.query)
-
+        # Get request body
         body = None
         if method in ["POST", "PUT", "PATCH"]:
             try:
-                if hasattr(req, 'body_json') and req.body_json is not None:
-                    body = req.body_json
-                elif hasattr(req, 'body_text') and req.body_text:
+                # Try body_json first (parsed JSON)
+                if hasattr(context.req, 'body_json') and context.req.body_json is not None:
+                    body = context.req.body_json
+                # Fallback to body_text
+                elif hasattr(context.req, 'body_text') and context.req.body_text:
                     try:
-                        body = json.loads(req.body_text)
+                        body = json.loads(context.req.body_text)
                     except (json.JSONDecodeError, ValueError):
-                        body = req.body_text
-                elif hasattr(req, 'body_binary') and req.body_binary:
-                    body = req.body_binary
+                        body = context.req.body_text
+                # For binary data
+                elif hasattr(context.req, 'body_binary') and context.req.body_binary:
+                    body = context.req.body_binary
             except Exception:
                 pass
-
+        
+        # Use FastAPI TestClient to route requests
         from fastapi.testclient import TestClient
         client = TestClient(app)
-
+        
+        # Make request to FastAPI app
         if method == "GET":
             response = client.get(path, params=query_params, headers=headers)
         elif method == "POST":
@@ -1039,21 +1035,22 @@ async def main(context):
                 response = client.request(method, path, content=body, params=query_params, headers=headers)
             else:
                 response = client.request(method, path, json=body, params=query_params, headers=headers)
-
+        
+        # Return response using Appwrite context
         status_code = response.status_code
         response_headers = dict(response.headers)
         content_type = response.headers.get("content-type", "")
-
+        
         if "application/json" in content_type:
-            return context.res.json(response.json(), status_code, response_headers)
+            return context.res.json(response.json())
         else:
-            return context.res.text(response.text, status_code, response_headers)
-
+            return context.res.text(response.text)
+        
     except Exception as e:
-        print(f"❌ Appwrite Function Error: {str(e)}")
+        context.error(f"Appwrite Function Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return context.res.json({"error": str(e), "status": "error"}, 500)
+        return context.res.json({"error": str(e), "status": "error"})
 
 if __name__ == "__main__":
     import uvicorn

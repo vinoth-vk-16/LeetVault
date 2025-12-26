@@ -33,9 +33,9 @@ curl -X POST https://your-function-url/sync \
 
 **Sync Specific User:**
 ```bash
-curl -X POST https://your-function-url/sync \
+curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync \
   -H "Content-Type: application/json" \
-  -d '{"user_email": "user@example.com"}'
+  -d '{"user_email": "imvinothvk521@gmail.com"}'
 ```
 
 **Response (All Users)** (200 OK):
