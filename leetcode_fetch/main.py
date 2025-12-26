@@ -846,20 +846,23 @@ async def sync_all_active_repos(user_email: Optional[str] = None):
         })
         
         # Get active repositories (optionally filtered by user email)
-        queries = [Query.equal("isActive", True)]
-        
-        # If user_email is provided, convert to userId format and filter
+        # Fetch all documents first (to avoid Query.equal boolean issues)
         if user_email:
             user_id = user_email.replace("@", "_").replace(".", "_")
-            queries.append(Query.equal("userId", user_id))
+            result = databases.list_documents(
+                database_id=APPWRITE_DATABASE_ID,
+                collection_id=COLLECTION_IDS["activated_repos"],
+                queries=[Query.equal("userId", user_id)]
+            )
+        else:
+            result = databases.list_documents(
+                database_id=APPWRITE_DATABASE_ID,
+                collection_id=COLLECTION_IDS["activated_repos"]
+            )
         
-        result = databases.list_documents(
-            database_id=APPWRITE_DATABASE_ID,
-            collection_id=COLLECTION_IDS["activated_repos"],
-            queries=queries
-        )
-        
-        active_repos = result["documents"]
+        # Filter for active repos in Python (to avoid SDK boolean query issues)
+        all_repos = result["documents"]
+        active_repos = [repo for repo in all_repos if repo.get("isActive") == True]
         user_filter_msg = f" for user {user_email}" if user_email else ""
         print(f"📊 Found {len(active_repos)} active repositories{user_filter_msg}")
         
