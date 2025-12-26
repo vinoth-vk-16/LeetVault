@@ -1047,74 +1047,160 @@ async def health_check():
         }
 
 # ---- Appwrite Function Wrapper ----
-async def main(context):
-    """Entry point for Appwrite Function"""
+def main(context):
+    """Entry point for Appwrite Function - handles all HTTP requests"""
     try:
-        req = context.req
-        path = req.path if hasattr(req, 'path') and req.path else "/"
-        method = (req.method if hasattr(req, 'method') and req.method else "GET").upper()
-        headers = dict(req.headers) if hasattr(req, 'headers') and req.headers else {}
-        query_params = {}
-        if hasattr(req, 'query') and req.query:
-            query_params = dict(req.query)
+        # Parse incoming request
+        path = context.req.path if context.req.path else "/"
+        method = context.req.method.upper() if context.req.method else "GET"
         
-        # Get request body - only for methods that typically have bodies
-        # Use Appwrite's recommended body properties: body_text, body_json, body_binary
-        body = None
+        context.log(f"📥 Incoming request: {method} {path}")
+        
+        # Parse query parameters from path if present
+        query_params = {}
+        if "?" in path:
+            path_parts = path.split("?", 1)
+            path = path_parts[0]
+            query_string = path_parts[1]
+            for param in query_string.split("&"):
+                if "=" in param:
+                    key, value = param.split("=", 1)
+                    query_params[key] = value
+        
+        # Parse request body for POST/PUT/PATCH
+        body_data = None
         if method in ["POST", "PUT", "PATCH"]:
             try:
-                # Try body_json first (parsed JSON, recommended by Appwrite)
-                if hasattr(req, 'body_json') and req.body_json is not None:
-                    body = req.body_json
-                # Fallback to body_text for text data
-                elif hasattr(req, 'body_text') and req.body_text:
-                    try:
-                        body = json.loads(req.body_text)
-                    except (json.JSONDecodeError, ValueError):
-                        body = req.body_text
-                # For binary data
-                elif hasattr(req, 'body_binary') and req.body_binary:
-                    body = req.body_binary
-            except Exception:
-                pass
+                # Try to parse as JSON first
+                if context.req.body_text:
+                    body_data = json.loads(context.req.body_text)
+                    context.log(f"📦 Request body: {body_data}")
+            except (json.JSONDecodeError, AttributeError):
+                context.log("⚠️  No valid JSON body found")
         
-        from fastapi.testclient import TestClient
-        client = TestClient(app)
+        # Route to appropriate handler
+        if path == "/" and method == "GET":
+            return context.res.json({
+                "message": "LeetVault API is running",
+                "version": "1.0.0",
+                "status": "healthy"
+            })
         
-        if method == "GET":
-            response = client.get(path, params=query_params, headers=headers)
-        elif method == "POST":
-            if isinstance(body, bytes):
-                response = client.post(path, content=body, params=query_params, headers=headers)
-            else:
-                response = client.post(path, json=body, params=query_params, headers=headers)
-        elif method == "PUT":
-            if isinstance(body, bytes):
-                response = client.put(path, content=body, params=query_params, headers=headers)
-            else:
-                response = client.put(path, json=body, params=query_params, headers=headers)
-        elif method == "DELETE":
-            response = client.delete(path, params=query_params, headers=headers)
+        elif path == "/health" and method == "GET":
+            try:
+                collections = databases.list_collections(APPWRITE_DATABASE_ID)
+                return context.res.json({
+                    "status": "healthy",
+                    "database": "connected",
+                    "collections_count": len(collections.get('collections', [])),
+                    "timestamp": get_current_timestamp()
+                })
+            except Exception as e:
+                return context.res.json({
+                    "status": "unhealthy",
+                    "database": "disconnected",
+                    "error": str(e),
+                    "timestamp": get_current_timestamp()
+                }, 500)
+        
+        elif path == "/api/users/check" and method == "POST":
+            if not body_data or "email" not in body_data:
+                return context.res.json({"error": "Email is required"}, 400)
+            
+            # Import asyncio to run async function
+            import asyncio
+            request = UserCheckRequest(email=body_data["email"])
+            result = asyncio.run(check_or_create_user(request))
+            return context.res.json(result.dict())
+        
+        elif path.startswith("/api/users/") and method == "GET":
+            email = path.split("/api/users/")[1]
+            import asyncio
+            result = asyncio.run(get_user_by_email(email))
+            return context.res.json(result)
+        
+        elif path == "/api/leetcode/credentials" and method == "POST":
+            if not body_data:
+                return context.res.json({"error": "Request body is required"}, 400)
+            
+            import asyncio
+            request = LeetCodeCredentialsRequest(**body_data)
+            result = asyncio.run(store_leetcode_credentials(request))
+            return context.res.json(result.dict(), 201)
+        
+        elif path.startswith("/api/leetcode/credentials/") and method == "GET":
+            email = path.split("/api/leetcode/credentials/")[1]
+            import asyncio
+            result = asyncio.run(get_leetcode_credentials(email))
+            return context.res.json(result.dict())
+        
+        elif path == "/api/auth/github/install" and method == "GET":
+            email = query_params.get("email")
+            if not email:
+                return context.res.json({"error": "Email parameter is required"}, 400)
+            
+            import asyncio
+            result = asyncio.run(get_installation_url(email))
+            return context.res.json(result)
+        
+        elif path == "/api/auth/github/callback" and method == "GET":
+            installation_id = query_params.get("installation_id")
+            setup_action = query_params.get("setup_action")
+            state = query_params.get("state")
+            code = query_params.get("code")
+            
+            if not installation_id or not setup_action or not state:
+                return context.res.json({"error": "Missing required parameters"}, 400)
+            
+            import asyncio
+            result = asyncio.run(github_installation_callback(
+                installation_id=installation_id,
+                setup_action=setup_action,
+                state=state,
+                code=code
+            ))
+            
+            # Handle redirect response
+            if hasattr(result, 'headers') and 'location' in result.headers:
+                return context.res.redirect(result.headers['location'])
+            return result
+        
+        elif path.startswith("/api/github/installations/") and path.endswith("/repositories") and method == "GET":
+            installation_id = path.split("/api/github/installations/")[1].split("/repositories")[0]
+            import asyncio
+            result = asyncio.run(get_installation_repositories(installation_id))
+            return context.res.json(result)
+        
+        elif path == "/api/repos/activate" and method == "POST":
+            if not body_data:
+                return context.res.json({"error": "Request body is required"}, 400)
+            
+            import asyncio
+            request = RepoActivationRequest(**body_data)
+            result = asyncio.run(activate_repository(request))
+            return context.res.json(result.dict(), 201)
+        
+        elif path.startswith("/api/repos/deactivate/") and method == "DELETE":
+            email = path.split("/api/repos/deactivate/")[1]
+            import asyncio
+            result = asyncio.run(deactivate_repository(email))
+            return context.res.json(result)
+        
         else:
-            if isinstance(body, bytes):
-                response = client.request(method, path, content=body, params=query_params, headers=headers)
-            else:
-                response = client.request(method, path, json=body, params=query_params, headers=headers)
-        
-        status_code = response.status_code
-        response_headers = dict(response.headers)
-        content_type = response.headers.get("content-type", "")
-        
-        if "application/json" in content_type:
-            return context.res.json(response.json(), status_code, response_headers)
-        else:
-            return context.res.text(response.text, status_code, response_headers)
+            return context.res.json({
+                "error": "Not Found",
+                "path": path,
+                "method": method
+            }, 404)
         
     except Exception as e:
-        print(f"❌ Appwrite Function Error: {str(e)}")
+        context.error(f"❌ Function Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return context.res.json({"error": str(e), "status": "error"}, 500)
+        return context.res.json({
+            "error": str(e),
+            "status": "error"
+        }, 500)
 
 
 if __name__ == "__main__":

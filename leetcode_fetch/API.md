@@ -133,19 +133,18 @@ Health check endpoint.
 
 **Request**:
 ```bash
-curl https://your-function-url/health
+curl -X GET https://69481b400019e83f08ad.sgp.appwrite.run/health
 ```
 
 **Response** (200 OK):
 ```json
 {
   "status": "healthy",
-  "service": "leetcode_fetch",
-  "version": "1.0.0"
+  "service": "LeetCode Fetch Service"
 }
 ```
 
----
+
 
 ## Sync Process Flow
 
@@ -376,7 +375,7 @@ When Appwrite scheduler triggers the function:
 For immediate sync or testing:
 
 ```bash
-curl -X POST https://your-function-url/sync
+curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync
 ```
 
 This triggers the sync via FastAPI endpoint (runs in background).
