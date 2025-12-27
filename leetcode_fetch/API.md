@@ -41,18 +41,46 @@ curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync \
 **Response (All Users)** (200 OK):
 ```json
 {
-  "message": "Parallel sync started for all active repositories",
-  "status": "running",
-  "user_email": null
+  "message": "Sync completed successfully",
+  "status": "completed",
+  "user_email": null,
+  "repositories_synced": 2,
+  "total_repositories": 2,
+  "total_problems": 150,
+  "results": [
+    {
+      "repo": "user/repo1",
+      "status": "success",
+      "problems": 75,
+      "user_email": "user1@example.com"
+    },
+    {
+      "repo": "user/repo2",
+      "status": "success",
+      "problems": 75,
+      "user_email": "user2@example.com"
+    }
+  ]
 }
 ```
 
 **Response (Specific User)** (200 OK):
 ```json
 {
-  "message": "Sync started for user user@example.com",
-  "status": "running",
-  "user_email": "user@example.com"
+  "message": "Sync completed successfully",
+  "status": "completed",
+  "user_email": "user@example.com",
+  "repositories_synced": 1,
+  "total_repositories": 1,
+  "total_problems": 75,
+  "results": [
+    {
+      "repo": "user/repo",
+      "status": "success",
+      "problems": 75,
+      "user_email": "user@example.com"
+    }
+  ]
 }
 ```
 
@@ -68,10 +96,11 @@ curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync \
 
 **Notes**:
 - Processes repositories concurrently using `asyncio.gather()`
-- Returns immediately and runs sync in background
-- Check `/status` endpoint for progress
+- **Runs synchronously** - waits for all syncs to complete before returning (Appwrite Functions requirement)
+- May take several minutes depending on number of repositories and problems
 - User email is converted to `userId` format internally (e.g., `user@example.com` → `user_example_com`)
 - **Sends email notification** to each user after their sync completes with progress summary
+- Appwrite Function timeout is set to 15 minutes to accommodate large syncs
 
 ---
 

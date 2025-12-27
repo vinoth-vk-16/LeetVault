@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
@@ -238,11 +238,12 @@ async def update_user_session_cookie(credential_id: str, new_session_cookie: str
     except Exception as e:
         print(f"❌ Failed to update session cookie: {str(e)}")
 
-def get_all_submissions(session_token: str, csrf_token: str = None) -> List[Dict]:
-    """Fetch all accepted submissions"""
+def get_all_submissions(session_token: str, csrf_token: str = None, hours_limit: int = 48) -> List[Dict]:
+    """Fetch accepted submissions from the last N hours (default: 48 hours)"""
     subs = []
     offset = 0
     limit = 20
+    cutoff_time = int(time.time()) - (hours_limit * 3600)  # Convert hours to seconds
 
     while True:
         data = graphql_request(
@@ -262,11 +263,16 @@ def get_all_submissions(session_token: str, csrf_token: str = None) -> List[Dict
         )
         s = data["data"]["submissionList"]
 
+        # Filter for accepted submissions within time limit
         accepted_subs = [
             sub for sub in s["submissions"]
-            if sub["statusDisplay"] == "Accepted"
+            if sub["statusDisplay"] == "Accepted" and int(sub["timestamp"]) >= cutoff_time
         ]
         subs.extend(accepted_subs)
+
+        # Stop if we've gone past the time limit
+        if s["submissions"] and int(s["submissions"][-1]["timestamp"]) < cutoff_time:
+            break
 
         if not s["hasNext"]:
             break
@@ -363,6 +369,127 @@ def create_or_update_file(token: str, repo_full_name: str, file_path: str, conte
     
     return response.json()
 
+def create_tree_with_files(token: str, repo_full_name: str, branch: str, files: List[Dict[str, str]]) -> str:
+    """
+    Create a git tree with multiple files
+    Returns the tree SHA
+    
+    files format: [{"path": "file/path.py", "content": "file content"}, ...]
+    """
+    # Get the latest commit SHA
+    ref_response = requests.get(
+        f"https://api.github.com/repos/{repo_full_name}/git/refs/heads/{branch}",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json"
+        }
+    )
+    
+    if not ref_response.ok:
+        raise Exception(f"Failed to get branch ref: {ref_response.text}")
+    
+    latest_commit_sha = ref_response.json()["object"]["sha"]
+    
+    # Get the base tree SHA from the latest commit
+    commit_response = requests.get(
+        f"https://api.github.com/repos/{repo_full_name}/git/commits/{latest_commit_sha}",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json"
+        }
+    )
+    
+    if not commit_response.ok:
+        raise Exception(f"Failed to get commit: {commit_response.text}")
+    
+    base_tree_sha = commit_response.json()["tree"]["sha"]
+    
+    # Create blobs for all files
+    tree_items = []
+    for file_info in files:
+        # Create blob
+        blob_response = requests.post(
+            f"https://api.github.com/repos/{repo_full_name}/git/blobs",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json"
+            },
+            json={
+                "content": file_info["content"],
+                "encoding": "utf-8"
+            }
+        )
+        
+        if not blob_response.ok:
+            raise Exception(f"Failed to create blob for {file_info['path']}: {blob_response.text}")
+        
+        blob_sha = blob_response.json()["sha"]
+        
+        tree_items.append({
+            "path": file_info["path"],
+            "mode": "100644",  # Regular file
+            "type": "blob",
+            "sha": blob_sha
+        })
+    
+    # Create tree
+    tree_response = requests.post(
+        f"https://api.github.com/repos/{repo_full_name}/git/trees",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json"
+        },
+        json={
+            "base_tree": base_tree_sha,
+            "tree": tree_items
+        }
+    )
+    
+    if not tree_response.ok:
+        raise Exception(f"Failed to create tree: {tree_response.text}")
+    
+    return tree_response.json()["sha"], latest_commit_sha
+
+def create_commit_and_update_ref(token: str, repo_full_name: str, branch: str, 
+                                  tree_sha: str, parent_sha: str, message: str):
+    """Create a commit with the tree and update the branch reference"""
+    # Create commit
+    commit_response = requests.post(
+        f"https://api.github.com/repos/{repo_full_name}/git/commits",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json"
+        },
+        json={
+            "message": message,
+            "tree": tree_sha,
+            "parents": [parent_sha]
+        }
+    )
+    
+    if not commit_response.ok:
+        raise Exception(f"Failed to create commit: {commit_response.text}")
+    
+    new_commit_sha = commit_response.json()["sha"]
+    
+    # Update branch reference
+    ref_response = requests.patch(
+        f"https://api.github.com/repos/{repo_full_name}/git/refs/heads/{branch}",
+        headers={
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json"
+        },
+        json={
+            "sha": new_commit_sha,
+            "force": False
+        }
+    )
+    
+    if not ref_response.ok:
+        raise Exception(f"Failed to update ref: {ref_response.text}")
+    
+    return new_commit_sha
+
 def generate_problem_files_content(summary: List[Dict], languages: List[str]) -> Dict[str, str]:
     """Generate content for difficulty-based problem files"""
     files_content = {}
@@ -384,8 +511,8 @@ def generate_problem_files_content(summary: List[Dict], languages: List[str]) ->
             for i, item in enumerate(sorted(problems, key=lambda x: x["title"]), 1):
                 slug = item["slug"]
                 title = item["title"]
-            url = f"./leetcode/{slug}"
-            content += f"| {i} | {title} | [Link]({url}) |\n"
+                url = f"./leetcode/{slug}"
+                content += f"| {i} | {title} | [Link]({url}) |\n"
             
             content += "\n---\n\n*Back to [LeetCode Progress](./LeetcodeProgress.md)*\n"
             files_content[f"{difficulty.lower()}-problems.md"] = content
@@ -635,6 +762,82 @@ def send_email(to_email: str, subject: str, html_content: str):
         print(f"❌ Failed to send email to {to_email}: {str(e)}")
         return False
 
+def get_existing_problems_from_repo(token: str, repo_full_name: str, branch: str) -> List[Dict]:
+    """
+    Get all existing problems from the repository by scanning the leetcode directory
+    Returns list of problems with their slugs, titles, and difficulties
+    """
+    try:
+        # Get contents of leetcode directory
+        response = requests.get(
+            f"https://api.github.com/repos/{repo_full_name}/contents/leetcode",
+            headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/vnd.github+json"
+            },
+            params={"ref": branch}
+        )
+        
+        if response.status_code != 200:
+            return []
+        
+        contents = response.json()
+        problems = []
+        
+        # Each directory in leetcode/ is a problem
+        for item in contents:
+            if item["type"] == "dir":
+                slug = item["name"]
+                
+                # Try to read the README to get title and difficulty
+                readme_response = requests.get(
+                    f"https://api.github.com/repos/{repo_full_name}/contents/leetcode/{slug}/README.md",
+                    headers={
+                        "Authorization": f"token {token}",
+                        "Accept": "application/vnd.github+json"
+                    },
+                    params={"ref": branch}
+                )
+                
+                if readme_response.status_code == 200:
+                    readme_data = readme_response.json()
+                    readme_content = base64.b64decode(readme_data["content"]).decode('utf-8')
+                    
+                    # Extract title from first line
+                    title_line = readme_content.split('\n')[0].replace('# ', '').strip()
+                    
+                    # Try to determine difficulty from the README content
+                    # LeetCode problem descriptions usually have difficulty mentioned
+                    difficulty = "Medium"  # Default
+                    
+                    # Check difficulty files to determine the difficulty
+                    for diff in ["Easy", "Medium", "Hard"]:
+                        diff_file_response = requests.get(
+                            f"https://api.github.com/repos/{repo_full_name}/contents/{diff.lower()}-problems.md",
+                            headers={
+                                "Authorization": f"token {token}",
+                                "Accept": "application/vnd.github+json"
+                            },
+                            params={"ref": branch}
+                        )
+                        
+                        if diff_file_response.status_code == 200:
+                            diff_content = base64.b64decode(diff_file_response.json()["content"]).decode('utf-8')
+                            if slug in diff_content or title_line in diff_content:
+                                difficulty = diff
+                                break
+                    
+                    problems.append({
+                        "slug": slug,
+                        "title": title_line,
+                        "difficulty": difficulty
+                    })
+        
+        return problems
+    except Exception as e:
+        print(f"  ⚠️ Failed to get existing problems: {str(e)}")
+        return []
+
 def generate_leetcode_progress_content(summary: List[Dict], languages: List[str]) -> str:
     """Generate content for LeetcodeProgress.md"""
     total = len(summary)
@@ -651,9 +854,9 @@ def generate_leetcode_progress_content(summary: List[Dict], languages: List[str]
 ---
 
 ### 📚 Problem Collections
-- **[Easy Problems](./leetcode/easy-problems.md)** - """ + str(count['Easy']) + """ problem""" + ("s" if count['Easy'] != 1 else "") + """
-- **[Medium Problems](./leetcode/medium-problems.md)** - """ + str(count['Medium']) + """ problem""" + ("s" if count['Medium'] != 1 else "") + """
-- **[Hard Problems](./leetcode/hard-problems.md)** - """ + str(count['Hard']) + """ problem""" + ("s" if count['Hard'] != 1 else "") + """
+- **[Easy Problems](./easy-problems.md)** - """ + str(count['Easy']) + """ problem""" + ("s" if count['Easy'] != 1 else "") + """
+- **[Medium Problems](./medium-problems.md)** - """ + str(count['Medium']) + """ problem""" + ("s" if count['Medium'] != 1 else "") + """
+- **[Hard Problems](./hard-problems.md)** - """ + str(count['Hard']) + """ problem""" + ("s" if count['Hard'] != 1 else "") + """
 
 ---
 
@@ -666,7 +869,7 @@ def generate_leetcode_progress_content(summary: List[Dict], languages: List[str]
     return content
 
 async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages: List[str]):
-    """Sync a single repository with LeetCode data"""
+    """Sync a single repository with LeetCode data - creates ONE commit with all changes"""
     repo_full_name = repo_data["repoFullName"]
     installation_id = repo_data["installationId"]
     branch = repo_data["defaultBranch"]
@@ -718,6 +921,9 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
 
         summary = []
         problems_created = 0
+        
+        # Collect all files to be created/updated in a single commit
+        files_to_commit = []
 
         for slug in slugs:
             try:
@@ -725,30 +931,12 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
                 pd = get_problem_data(slug, session_cookie, csrf_token)
                 subs = by_slug[slug]
                 
-                # Create problem README
+                # Prepare problem README
                 problem_readme_path = f"leetcode/{slug}/README.md"
                 readme_content = f"# {pd['title']}\n\n{html_to_md(pd.get('content',''))}\n"
+                files_to_commit.append({"path": problem_readme_path, "content": readme_content})
                 
-                sha = get_file_sha(token, repo_full_name, problem_readme_path, branch)
-                create_or_update_file(
-                    token, repo_full_name, problem_readme_path, readme_content,
-                    f"Add problem: {pd['title']}", branch, sha
-                )
-                
-                # Save solution template
-                for snippet in pd.get("codeSnippets", []):
-                    if snippet["lang"].lower() in languages:
-                        ext = EXT_MAP.get(snippet['lang'].lower(), snippet['lang'].lower())
-                        template_path = f"leetcode/{slug}/solutiontemplate.{ext}"
-                        
-                        sha = get_file_sha(token, repo_full_name, template_path, branch)
-                        create_or_update_file(
-                            token, repo_full_name, template_path, snippet["code"],
-                            f"Add solution template for {pd['title']}", branch, sha
-                        )
-                        break
-                
-                # Save submissions
+                # Prepare submissions (only new ones - no empty templates)
                 for sub in subs:
                     lang = sub["lang"].lower()
                     if lang not in languages:
@@ -764,10 +952,7 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
                         continue
                     
                     code = get_submission_code(int(sub["id"]), session_cookie, csrf_token)
-                    create_or_update_file(
-                        token, repo_full_name, submission_path, code,
-                        f"Add {lang} solution for {pd['title']}", branch
-                    )
+                    files_to_commit.append({"path": submission_path, "content": code})
                 
                 summary.append({"slug": slug, "title": pd["title"], "difficulty": pd["difficulty"]})
                 problems_created += 1
@@ -776,25 +961,35 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
             except Exception as e:
                 print(f"  ❌ Failed to process {slug}: {str(e)}")
         
-        # Generate and update LeetcodeProgress.md
-        if summary:
-            progress_content = generate_leetcode_progress_content(summary, languages)
-            sha = get_file_sha(token, repo_full_name, "LeetcodeProgress.md", branch)
-            create_or_update_file(
-                token, repo_full_name, "LeetcodeProgress.md", progress_content,
-                f"Update LeetCode progress: {len(summary)} problems", branch, sha
-            )
+        # Get existing problems from repo for cumulative counts
+        print(f"  📊 Getting existing problems from repository...")
+        existing_problems = get_existing_problems_from_repo(token, repo_full_name, branch)
+        
+        # Merge new problems with existing ones (avoid duplicates by slug)
+        all_problems_dict = {p["slug"]: p for p in existing_problems}
+        for new_prob in summary:
+            all_problems_dict[new_prob["slug"]] = new_prob  # New problems override existing
+        
+        cumulative_summary = list(all_problems_dict.values())
+        print(f"  📈 Total problems in repo: {len(cumulative_summary)} (including {len(summary)} new from this sync)")
+        
+        # Add LeetcodeProgress.md and difficulty files with cumulative counts
+        if cumulative_summary:
+            progress_content = generate_leetcode_progress_content(cumulative_summary, languages)
+            files_to_commit.append({"path": "LeetcodeProgress.md", "content": progress_content})
             
-            # Generate and update difficulty-based problem files
-            problem_files = generate_problem_files_content(summary, languages)
+            # Add difficulty-based problem files with cumulative counts
+            problem_files = generate_problem_files_content(cumulative_summary, languages)
             for filename, content in problem_files.items():
-                # These files go in the root directory, not inside leetcode/
-                file_path = filename
-                sha = get_file_sha(token, repo_full_name, file_path, branch)
-                create_or_update_file(
-                    token, repo_full_name, file_path, content,
-                    f"Update {filename}", branch, sha
-                )
+                files_to_commit.append({"path": filename, "content": content})
+        
+        # Create single commit with all files
+        if files_to_commit:
+            print(f"  📦 Creating single commit with {len(files_to_commit)} files...")
+            tree_sha, parent_sha = create_tree_with_files(token, repo_full_name, branch, files_to_commit)
+            commit_message = f"🎉 LeetVault Sync: {problems_created} problems synced"
+            create_commit_and_update_ref(token, repo_full_name, branch, tree_sha, parent_sha, commit_message)
+            print(f"  ✅ Single commit created with all changes")
         
         # Update lastSyncAt in database
         databases.update_document(
@@ -930,7 +1125,7 @@ class SyncRequest(BaseModel):
     user_email: Optional[str] = None
 
 @app.post("/sync")
-async def trigger_sync(background_tasks: BackgroundTasks, request: SyncRequest = None):
+async def trigger_sync(request: SyncRequest = None):
     """
     Trigger parallel sync for active repositories
     
@@ -939,6 +1134,7 @@ async def trigger_sync(background_tasks: BackgroundTasks, request: SyncRequest =
                               If omitted, syncs all active repositories
     
     This will process repos simultaneously for maximum efficiency
+    Note: This runs synchronously in Appwrite Functions (no background tasks support)
     """
     global fetch_status
 
@@ -946,18 +1142,25 @@ async def trigger_sync(background_tasks: BackgroundTasks, request: SyncRequest =
         raise HTTPException(status_code=409, detail="Sync already in progress")
 
     user_email = request.user_email if request else None
-    background_tasks.add_task(sync_all_active_repos, user_email)
-
-    if user_email:
-        message = f"Sync started for user {user_email}"
-    else:
-        message = "Parallel sync started for all active repositories"
-
-    return {
-        "message": message,
-        "status": "running",
-        "user_email": user_email
-    }
+    
+    # Run sync directly (not in background) for Appwrite Functions compatibility
+    try:
+        results = await sync_all_active_repos(user_email)
+        
+        successful_syncs = sum(1 for r in results if isinstance(r, dict) and r.get("status") == "success")
+        total_problems = sum(r.get("problems", 0) for r in results if isinstance(r, dict) and r.get("status") == "success")
+        
+        return {
+            "message": "Sync completed successfully",
+            "status": "completed",
+            "user_email": user_email,
+            "repositories_synced": successful_syncs,
+            "total_repositories": len(results),
+            "total_problems": total_problems,
+            "results": results
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 @app.get("/status")
 async def get_fetch_status():

@@ -196,7 +196,7 @@ You can also trigger sync manually anytime:
 curl -X POST https://your-function-url/sync
 ```
 
-This routes through FastAPI and runs sync in the background.
+This routes through FastAPI and runs sync synchronously (waits for completion before returning).
 
 ## 📧 Email Notifications
 

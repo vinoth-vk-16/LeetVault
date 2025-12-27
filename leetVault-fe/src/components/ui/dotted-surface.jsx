@@ -159,10 +159,10 @@ export function DottedSurface({ className, isDark = true, ...props }) {
 	}, [isDark]);
 
 	return (
-		<div
-			ref={containerRef}
+        <div
+            ref={containerRef}
 			className={cn('pointer-events-none fixed inset-0 -z-10', className)}
 			{...props}
 		/>
-	);
+    );
 }
