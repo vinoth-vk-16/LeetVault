@@ -897,11 +897,9 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
                 "userId": user_id,
                 "repoId": repo_id,
                 "syncType": "manual",
-                "status": "in_progress",
+                "status": "pending",  # Enum: pending, success, failed, partial
                 "submissionsCount": 0,
-                "errorMessage": None,
-                "startedAt": start_time,
-                "completedAt": None
+                "startedAt": start_time
             }
         )
         sync_log_id = sync_log["$id"]
@@ -1037,7 +1035,7 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
                     collection_id=COLLECTION_IDS["sync_logs"],
                     document_id=sync_log_id,
                     data={
-                        "status": "completed",
+                        "status": "success",  # Enum: pending, success, failed, partial
                         "submissionsCount": problems_created,
                         "completedAt": datetime.now().isoformat()
                     }
