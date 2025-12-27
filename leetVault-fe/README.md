@@ -129,9 +129,23 @@ VITE_FIREBASE_APP_ID=your_app_id
 
 1. User lands on the landing page
 2. Clicks "Get Started" to navigate to login
-3. Signs in with Google
-4. Redirected to protected home page
-5. Can logout to return to landing page
+3. Signs in with Google (Firebase Authentication)
+4. **Backend user creation**: After successful Firebase auth, the app automatically calls the `/api/users/create` endpoint to create the user in the backend database
+5. **Loading state**: A loader is displayed while the user account is being created
+6. Redirected to protected home page
+7. Can logout to return to landing page
+
+### User Creation vs User Fetching
+
+- **Login/Signup** (`LoginPage.jsx`): Calls `POST /api/users/create` after Firebase authentication
+  - Creates new user if doesn't exist
+  - Returns 409 Conflict if user already exists (which is fine)
+  - Shows loading overlay during creation
+  
+- **Home Page** (`HomePage.jsx`): Calls `GET /api/users/check?email={email}` on page load
+  - Fetches existing user data (GitHub status, repo activation, etc.)
+  - Returns 404 if user not found (shouldn't happen if login worked correctly)
+  - No user creation happens here
 
 ## GitHub Integration Flow
 
@@ -144,13 +158,16 @@ VITE_FIREBASE_APP_ID=your_app_id
 
 ### API Endpoints Used
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/users/check` | POST | Check/create user and get GitHub status |
-| `/api/auth/github/install` | GET | Get GitHub App installation URL |
-| `/api/github/installations/{id}/repositories` | GET | List available repositories |
-| `/api/repos/activate` | POST | Activate a repository for syncing |
-| `/api/repos/deactivate/{email}` | DELETE | Deactivate current repository |
+| Endpoint | Method | Description | Used In |
+|----------|--------|-------------|---------|
+| `/api/users/create` | POST | Create new user in backend | Login flow (after Firebase auth) |
+| `/api/users/check?email={email}` | GET | Get user data with GitHub and repo status | Home page load |
+| `/api/leetcode/credentials` | POST | Save LeetCode credentials | Home page (credentials form) |
+| `/api/leetcode/credentials/{email}` | GET | Fetch LeetCode credentials | Home page load |
+| `/api/auth/github/install?email={email}` | GET | Get GitHub App installation URL | GitHub connect button |
+| `/api/github/installations/{id}/repositories` | GET | List available repositories | After GitHub connection |
+| `/api/repos/activate` | POST | Activate a repository for syncing | Repository selection |
+| `/api/repos/deactivate/{email}` | DELETE | Deactivate current repository | Disconnect repo button |
 
 ## LeetCode Credentials
 

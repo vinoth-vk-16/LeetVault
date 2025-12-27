@@ -51,19 +51,18 @@ export default function HomePage() {
     try {
       setLoading(true);
       
-      // Step 1: Check/Create user
-      const userResponse = await fetch(`${API_BASE_URL}/api/users/check`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: currentUser.email
-        })
+      // Step 1: Get user data (user should already exist from login)
+      const userResponse = await fetch(`${API_BASE_URL}/api/users/check?email=${encodeURIComponent(currentUser.email)}`, {
+        method: 'GET'
       });
 
       if (!userResponse.ok) {
-        throw new Error('Failed to check user');
+        if (userResponse.status === 404) {
+          // User not found - this shouldn't happen if login flow worked correctly
+          console.error('User not found in database. Please try logging out and logging in again.');
+          throw new Error('User not found. Please try logging in again.');
+        }
+        throw new Error('Failed to fetch user data');
       }
 
       const data = await userResponse.json();
