@@ -82,7 +82,7 @@ curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync \
     }
   ]
 }
-```
+````
 
 **Error Response** (409 Conflict):
 ```json
