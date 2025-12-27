@@ -14,6 +14,7 @@ import jwt
 from appwrite.client import Client
 from appwrite.services.databases import Databases
 from appwrite.query import Query
+from appwrite.id import ID
 from dotenv import load_dotenv
 import smtplib
 from email.mime.text import MIMEText
@@ -874,12 +875,39 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
     installation_id = repo_data["installationId"]
     branch = repo_data["defaultBranch"]
     user_id = repo_data["userId"]
+    repo_id = repo_data["$id"]
     
     session_cookie = credentials["sessionCookie"]
     csrf_token = credentials["csrfToken"]
     credential_id = credentials["credentialId"]
     
     print(f"🔄 Syncing {repo_full_name}...")
+    
+    # Create sync log entry
+    sync_log_id = None
+    start_time = datetime.now().isoformat()
+    
+    try:
+        # Create initial sync log
+        sync_log = databases.create_document(
+            database_id=APPWRITE_DATABASE_ID,
+            collection_id=COLLECTION_IDS["sync_logs"],
+            document_id=ID.unique(),
+            data={
+                "userId": user_id,
+                "repoId": repo_id,
+                "syncType": "manual",
+                "status": "in_progress",
+                "submissionsCount": 0,
+                "errorMessage": None,
+                "startedAt": start_time,
+                "completedAt": None
+            }
+        )
+        sync_log_id = sync_log["$id"]
+        print(f"  📝 Created sync log: {sync_log_id}")
+    except Exception as log_error:
+        print(f"  ⚠️ Failed to create sync log: {str(log_error)}")
     
     try:
         # Get installation token
@@ -1001,6 +1029,23 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
         
         print(f"  ✅ Successfully synced {problems_created} problems to {repo_full_name}")
         
+        # Update sync log with success
+        if sync_log_id:
+            try:
+                databases.update_document(
+                    database_id=APPWRITE_DATABASE_ID,
+                    collection_id=COLLECTION_IDS["sync_logs"],
+                    document_id=sync_log_id,
+                    data={
+                        "status": "completed",
+                        "submissionsCount": problems_created,
+                        "completedAt": datetime.now().isoformat()
+                    }
+                )
+                print(f"  ✅ Updated sync log with success")
+            except Exception as log_error:
+                print(f"  ⚠️ Failed to update sync log: {str(log_error)}")
+        
         # Send email notification to user
         try:
             # Get user email from userId
@@ -1027,6 +1072,24 @@ async def sync_repo_with_leetcode(repo_data: dict, credentials: dict, languages:
         
     except Exception as e:
         print(f"  ❌ Failed to sync {repo_full_name}: {str(e)}")
+        
+        # Update sync log with failure
+        if sync_log_id:
+            try:
+                databases.update_document(
+                    database_id=APPWRITE_DATABASE_ID,
+                    collection_id=COLLECTION_IDS["sync_logs"],
+                    document_id=sync_log_id,
+                    data={
+                        "status": "failed",
+                        "errorMessage": str(e),
+                        "completedAt": datetime.now().isoformat()
+                    }
+                )
+                print(f"  ✅ Updated sync log with failure")
+            except Exception as log_error:
+                print(f"  ⚠️ Failed to update sync log: {str(log_error)}")
+        
         return {"repo": repo_full_name, "status": "failed", "error": str(e)}
 
 async def sync_all_active_repos(user_email: Optional[str] = None):

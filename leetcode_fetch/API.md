@@ -3,7 +3,7 @@
 ## Base URL
 
 ```
-https://69481b400019e83f08ad.sgp.appwrite.run
+https://694f7a8b0010083be227.sgp.appwrite.run
 ```
 
 ---
@@ -27,13 +27,13 @@ Trigger parallel sync for active repositories.
 
 **Sync All Users:**
 ```bash
-curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync \
+curl -X POST https://694f7a8b0010083be227.sgp.appwrite.run/sync \
   -H "Content-Type: application/json"
 ```
 
 **Sync Specific User:**
 ```bash
-curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync \
+curl -X POST https://694f7a8b0010083be227.sgp.appwrite.run/sync \
   -H "Content-Type: application/json" \
   -d '{"user_email": "imvinothvk521@gmail.com"}'
 ```
@@ -110,7 +110,7 @@ Get current sync status and statistics.
 
 **Request**:
 ```bash
-curl https://69481b400019e83f08ad.sgp.appwrite.run/status
+curl https://694f7a8b0010083be227.sgp.appwrite.run/status
 ```
 
 **Response** (200 OK):
@@ -162,7 +162,7 @@ Health check endpoint.
 
 **Request**:
 ```bash
-curl -X GET https://69481b400019e83f08ad.sgp.appwrite.run/health
+curl -X GET https://694f7a8b0010083be227.sgp.appwrite.run/health
 ```
 
 **Response** (200 OK):
@@ -345,7 +345,7 @@ Poll the `/status` endpoint:
 
 ```bash
 while true; do
-  curl -s https://69481b400019e83f08ad.sgp.appwrite.run/status | jq '.status, .message'
+  curl -s https://694f7a8b0010083be227.sgp.appwrite.run/status | jq '.status, .message'
   sleep 5
 done
 ```
@@ -404,7 +404,7 @@ When Appwrite scheduler triggers the function:
 For immediate sync or testing:
 
 ```bash
-curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync
+curl -X POST https://694f7a8b0010083be227.sgp.appwrite.run/sync
 ```
 
 This triggers the sync via FastAPI endpoint (runs in background).
@@ -421,13 +421,13 @@ Check **Appwrite Console** → Your Function → **Executions** to see scheduled
 
 ```bash
 # Trigger sync
-curl -X POST https://69481b400019e83f08ad.sgp.appwrite.run/sync
+curl -X POST https://694f7a8b0010083be227.sgp.appwrite.run/sync
 
 # Wait a few seconds
 sleep 10
 
 # Check status
-curl https://69481b400019e83f08ad.sgp.appwrite.run/status
+curl https://694f7a8b0010083be227.sgp.appwrite.run/status
 ```
 
 ### Test with Multiple Users

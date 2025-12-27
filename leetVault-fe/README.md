@@ -203,7 +203,7 @@ The application uses Tailwind CSS with a dark theme palette:
 The frontend connects to the backend API at `http://localhost:8000` by default. This is configured in `HomePage.jsx`:
 
 ```javascript
-const API_BASE_URL = 'http://69481ac30014e1672988.sgp.appwrite.run';
+const API_BASE_URL = 'http://694f7e6e000aeef6e320.sgp.appwrite.run';
 ```
 
 ## License

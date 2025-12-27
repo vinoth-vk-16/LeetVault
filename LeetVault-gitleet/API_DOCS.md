@@ -4,7 +4,7 @@ Complete API reference with request/response structures and curl commands.
 
 ## Base URL
 ```
-https://69481ac30014e1672988.sgp.appwrite.run
+https://694f7e6e000aeef6e320.sgp.appwrite.run
 ```
 
 ## Quick Start
@@ -16,7 +16,7 @@ python main.py
 
 2. **Test Health**
 ```bash
-curl https://69481ac30014e1672988.sgp.appwrite.run/health
+curl https://694f7e6e000aeef6e320.sgp.appwrite.run/health
 ```
 
 3. **Note**: Interactive docs (Swagger UI/ReDoc) are not available in Appwrite Functions deployment
@@ -84,7 +84,7 @@ Check if user exists, create if not. Returns complete user status including GitH
 
 **Curl Command:**
 ```bash
-curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/users/check" \
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/users/check" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 ```
@@ -122,7 +122,7 @@ Get user information by email.
 
 **Curl Command:**
 ```bash
-curl "https://69481ac30014e1672988.sgp.appwrite.run/api/users/user@example.com"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/users/user@example.com"
 ```
 
 ---
@@ -187,7 +187,7 @@ Store or update LeetCode credentials for a user. User must exist before storing 
 
 **Curl Command:**
 ```bash
-curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/leetcode/credentials" \
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/leetcode/credentials" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -229,7 +229,7 @@ Get LeetCode credentials for a user by email.
 
 **Curl Command:**
 ```bash
-curl "https://69481ac30014e1672988.sgp.appwrite.run/api/leetcode/credentials/user@example.com"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/leetcode/credentials/user@example.com"
 ```
 
 ---
@@ -252,7 +252,7 @@ Get GitHub App installation URL for a user.
 
 **Curl Command:**
 ```bash
-curl "https://69481ac30014e1672988.sgp.appwrite.run/api/auth/github/install?email=user@example.com"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/auth/github/install?email=user@example.com"
 ```
 
 **Usage Flow:**
@@ -333,7 +333,7 @@ Get repositories accessible by a GitHub installation.
 
 **Curl Command:**
 ```bash
-curl "https://69481ac30014e1672988.sgp.appwrite.run/api/github/installations/12345678/repositories"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/github/installations/12345678/repositories"
 ```
 
 ---
@@ -403,7 +403,7 @@ Activate a repository for LeetCode submissions sync. Only one repository can be 
 
 **Curl Command:**
 ```bash
-curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/repos/activate" \
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/repos/activate" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -452,7 +452,7 @@ Deactivate the currently activated repository for a user.
 
 **Curl Command:**
 ```bash
-curl -X DELETE "https://69481ac30014e1672988.sgp.appwrite.run/api/repos/deactivate/user@example.com"
+curl -X DELETE "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/repos/deactivate/user@example.com"
 ```
 
 ---
@@ -483,7 +483,7 @@ Health check endpoint with database connectivity test.
 
 **Curl Command:**
 ```bash
-curl "https://69481ac30014e1672988.sgp.appwrite.run/health"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/health"
 ```
 
 ---
@@ -502,7 +502,7 @@ API information endpoint.
 
 **Curl Command:**
 ```bash
-curl "https://69481ac30014e1672988.sgp.appwrite.run/"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/"
 ```
 
 ---
@@ -513,14 +513,14 @@ curl "https://69481ac30014e1672988.sgp.appwrite.run/"
 
 ```bash
 # 1. Create User
-curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/users/check" \
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/users/check" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 
 # Response: user_id, github_status=false, repo_activation=false
 
 # 2. Get GitHub Installation URL
-curl "https://69481ac30014e1672988.sgp.appwrite.run/api/auth/github/install?email=user@example.com"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/auth/github/install?email=user@example.com"
 
 # Response: installation_url
 
@@ -531,12 +531,12 @@ curl "https://69481ac30014e1672988.sgp.appwrite.run/api/auth/github/install?emai
 # - Callback stores installation, sets github_status=true
 
 # 4. Get Available Repositories
-curl "https://69481ac30014e1672988.sgp.appwrite.run/api/github/installations/YOUR_INSTALLATION_ID/repositories"
+curl "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/github/installations/YOUR_INSTALLATION_ID/repositories"
 
 # Response: List of repositories
 
 # 5. Activate Repository
-curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/repos/activate" \
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/repos/activate" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -548,7 +548,7 @@ curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/repos/activate" 
 # Response: Repository activated, repo_activation=true
 
 # 6. Store LeetCode Credentials
-curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/leetcode/credentials" \
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/leetcode/credentials" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "user@example.com",
@@ -559,14 +559,14 @@ curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/leetcode/credent
 # Response: Credentials stored
 
 # 7. Check Complete User Status
-curl -X POST "https://69481ac30014e1672988.sgp.appwrite.run/api/users/check" \
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/users/check" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com"}'
 
 # Response: Complete user info with github_status=true, repo_activation=true, activated_repo details
 
 # 8. (Optional) Deactivate Repository
-curl -X DELETE "https://69481ac30014e1672988.sgp.appwrite.run/api/repos/deactivate/user@example.com"
+curl -X DELETE "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/repos/deactivate/user@example.com"
 
 # Response: Repository deactivated, repo_activation=false
 ```
@@ -654,7 +654,7 @@ Invalid request format or missing required fields.
 
 ### Health Check
 ```bash
-curl https://69481ac30014e1672988.sgp.appwrite.run/health
+curl https://694f7e6e000aeef6e320.sgp.appwrite.run/health
 ```
 
 ### Note
