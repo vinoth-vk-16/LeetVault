@@ -1,6 +1,6 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, Code2, Home, Settings, Edit2, Save, X, Github, ExternalLink } from 'lucide-react';
+import { LogOut, Code2, Home, Settings, Edit2, Save, X, Github, ExternalLink, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_CRUD;
@@ -29,6 +29,7 @@ export default function HomePage() {
   const [activatedRepo, setActivatedRepo] = useState(null);
   const [connectingRepo, setConnectingRepo] = useState(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Check if returning from GitHub installation callback
   useEffect(() => {
@@ -512,15 +513,16 @@ export default function HomePage() {
                     </div>
                   </div>
                 ) : (
-                  // Show repository selection cards
+                  // Show repository selection list
                   <div>
-                    <p className="text-gray-400 mb-4">Select a repository to sync your LeetCode solutions:</p>
+                    <h4 className="text-xl font-semibold text-white mb-6">Connect Git repository</h4>
+                    
                     {loadingRepos ? (
-                      <div className="text-center py-8">
+                      <div className="text-center py-12">
                         <div className="text-gray-400">Loading repositories...</div>
                       </div>
                     ) : repositories.length === 0 ? (
-                      <div className="text-center py-8">
+                      <div className="text-center py-12">
                         <p className="text-gray-400 mb-4">No repositories found. Please make sure you have granted access to at least one repository.</p>
                         <button
                           onClick={handleConnectGitHub}
@@ -530,43 +532,84 @@ export default function HomePage() {
                         </button>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {repositories.map(repo => (
-                          <div 
-                            key={repo.id} 
-                            className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600 transition-all duration-200"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-start space-x-3">
+                      <div>
+                        {/* User/Organization Selector and Search */}
+                        <div className="flex items-center gap-4 mb-6">
+                          <select className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]">
+                            <option>{repositories[0]?.full_name.split('/')[0] || 'vinoth-vk-16'}</option>
+                          </select>
+                          
+                          <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                            <input
+                              type="text"
+                              placeholder="Search repositories"
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="w-full pl-10 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Repository List */}
+                        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                          {repositories
+                            .filter(repo => 
+                              repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              repo.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+                            )
+                            .map((repo, index) => (
+                            <div 
+                              key={repo.id}
+                              className={`flex items-center justify-between p-4 hover:bg-gray-750 transition-colors ${
+                                index !== repositories.length - 1 ? 'border-b border-gray-700' : ''
+                              }`}
+                            >
+                              <div className="flex items-center space-x-4 flex-1">
                                 <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
-                                  <Github className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                  <h4 className="text-white font-semibold">{repo.name}</h4>
-                                  <p className="text-sm text-gray-400">{repo.full_name}</p>
-                                  {repo.description && (
-                                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{repo.description}</p>
+                                  {repo.language === 'Python' ? (
+                                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98l-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95l.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25l-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z"/>
+                                    </svg>
+                                  ) : repo.language === 'Flutter' ? (
+                                    <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M14.314 0L2.3 12 6 15.7 21.684.013h-7.357zm.014 11.072L7.857 17.53l6.47 6.47H21.7l-6.46-6.468 6.46-6.46h-7.37z"/>
+                                    </svg>
+                                  ) : (
+                                    <Github className="w-5 h-5 text-white" />
                                   )}
-                                  <div className="flex items-center space-x-2 mt-2">
-                                    <span className={`text-xs px-2 py-0.5 rounded ${repo.private ? 'bg-yellow-900/50 text-yellow-400' : 'bg-green-900/50 text-green-400'}`}>
-                                      {repo.private ? 'Private' : 'Public'}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      Branch: {repo.default_branch}
-                                    </span>
-                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-white font-medium">{repo.name}</h4>
+                                  <p className="text-sm text-gray-400 truncate">{repo.updated_at ? new Date(repo.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ago' : 'Recently updated'}</p>
                                 </div>
                               </div>
+                              <button
+                                onClick={() => handleActivateRepo(repo.full_name, repo.default_branch)}
+                                disabled={connectingRepo === repo.full_name}
+                                className="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                              >
+                                {connectingRepo === repo.full_name ? 'Connecting...' : 'Connect'}
+                              </button>
                             </div>
-                            <button
-                              onClick={() => handleActivateRepo(repo.full_name, repo.default_branch)}
-                              disabled={connectingRepo === repo.full_name}
-                              className="w-full mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {connectingRepo === repo.full_name ? 'Connecting...' : 'Connect'}
+                          ))}
+                        </div>
+
+                        {/* Pagination Footer */}
+                        <div className="mt-4 flex items-center justify-between text-sm text-gray-400">
+                          <span>Total results: {repositories.filter(repo => 
+                            repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            repo.full_name.toLowerCase().includes(searchQuery.toLowerCase())
+                          ).length}</span>
+                          <div className="flex items-center gap-4">
+                            <button className="hover:text-white transition-colors disabled:opacity-50" disabled>
+                              Prev
+                            </button>
+                            <button className="hover:text-white transition-colors disabled:opacity-50" disabled>
+                              Next
                             </button>
                           </div>
-                        ))}
+                        </div>
                       </div>
                     )}
                   </div>

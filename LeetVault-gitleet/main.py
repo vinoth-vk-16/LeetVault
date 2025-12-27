@@ -240,14 +240,14 @@ async def root():
         "status": "healthy"
     }
 
-@app.post("/api/users/check", response_model=UserResponse, status_code=status.HTTP_200_OK)
-async def check_or_create_user(request: UserCheckRequest):
+@app.post("/api/users/create", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(request: UserCheckRequest):
     """
-    Check if user exists in database, create if not exists
+    Create a new user in the database
     
     - **email**: User's email address
     
-    Returns user information and whether the user was newly created
+    Returns user information if created successfully, or error if user already exists
     """
     try:
         email = request.email.lower()  # Normalize email to lowercase
@@ -256,111 +256,157 @@ async def check_or_create_user(request: UserCheckRequest):
         # Get users collection ID
         users_collection_id = get_collection_id("users")
         
-        # Try to get existing user by document ID
+        # Check if user already exists
+        try:
+            existing_user = databases.get_document(
+                database_id=APPWRITE_DATABASE_ID,
+                collection_id=users_collection_id,
+                document_id=user_id
+            )
+            # User already exists
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User already exists"
+            )
+        except AppwriteException as e:
+            # User doesn't exist (404 error), proceed to create
+            if e.code != 404:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Database error: {str(e)}"
+                )
+        
+        # Create new user document
+        current_time = get_current_timestamp()
+        new_user = databases.create_document(
+            database_id=APPWRITE_DATABASE_ID,
+            collection_id=users_collection_id,
+            document_id=user_id,  # Use email-based ID
+            data={
+                'email': email,
+                'name': None,  # Can be updated later
+                'Github_status': False,  # Default false
+                'Repo_activation': False,  # Default false
+                'createdAt': current_time,
+                'updatedAt': current_time
+            }
+        )
+        
+        return UserResponse(
+            success=True,
+            message="User created successfully",
+            user_id=new_user['$id'],
+            email=new_user['email'],
+            name=new_user.get('name'),
+            created_at=new_user.get('createdAt'),
+            updated_at=new_user.get('updatedAt'),
+            is_new_user=True,
+            github_status=False,
+            installation_id=None,
+            repo_activation=False,
+            activated_repo=None
+        )
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Unexpected error: {str(e)}"
+        )
+
+
+@app.get("/api/users/check", response_model=UserResponse, status_code=status.HTTP_200_OK)
+async def get_user(email: str):
+    """
+    Get user information from database
+    
+    - **email**: User's email address (query parameter)
+    
+    Returns complete user information including GitHub status and activated repo details
+    """
+    try:
+        email = email.lower()  # Normalize email to lowercase
+        user_id = email_to_id(email)
+        
+        # Get users collection ID
+        users_collection_id = get_collection_id("users")
+        
+        # Get user document
         try:
             user_doc = databases.get_document(
                 database_id=APPWRITE_DATABASE_ID,
                 collection_id=users_collection_id,
                 document_id=user_id
             )
-            
-            # Check GitHub status and fetch installation_id if connected
-            github_status = bool(user_doc.get('Github_status', False))
-            installation_id = None
-            
-            if github_status:
-                try:
-                    github_installations_collection_id = get_collection_id("github_installations")
-                    installations = databases.list_documents(
-                        database_id=APPWRITE_DATABASE_ID,
-                        collection_id=github_installations_collection_id,
-                        queries=[Query.equal('userId', user_id)]
-                    )
-                    if installations['total'] > 0:
-                        installation_id = installations['documents'][0].get('githubInstallationId')
-                except Exception as e:
-                    print(f"Error fetching installation: {e}")
-            
-            # Check repo activation status and fetch activated repo if true
-            repo_activation = bool(user_doc.get('Repo_activation', False))
-            activated_repo = None
-            
-            if repo_activation:
-                try:
-                    activated_repos_collection_id = get_collection_id("activated_repos")
-                    repos = databases.list_documents(
-                        database_id=APPWRITE_DATABASE_ID,
-                        collection_id=activated_repos_collection_id,
-                        queries=[Query.equal('userId', user_id)]
-                    )
-                    if repos['total'] > 0:
-                        repo_doc = repos['documents'][0]
-                        activated_repo = {
-                            "repo_full_name": repo_doc.get('repoFullName'),
-                            "default_branch": repo_doc.get('defaultBranch'),
-                            "is_active": repo_doc.get('isActive'),
-                            "activated_at": repo_doc.get('activatedAt'),
-                            "last_sync_at": repo_doc.get('lastSyncAt')
-                        }
-                except Exception as e:
-                    print(f"Error fetching activated repo: {e}")
-            
-            # User exists, return user data with GitHub and repo info
-            return UserResponse(
-                success=True,
-                message="User already exists in database",
-                user_id=user_doc['$id'],
-                email=user_doc['email'],
-                name=user_doc.get('name'),
-                created_at=user_doc.get('createdAt'),
-                updated_at=user_doc.get('updatedAt'),
-                is_new_user=False,
-                github_status=github_status,
-                installation_id=installation_id,
-                repo_activation=repo_activation,
-                activated_repo=activated_repo
-            )
-            
         except AppwriteException as e:
-            # User doesn't exist (404 error), create new user
             if e.code == 404:
-                current_time = get_current_timestamp()
-                
-                # Create new user document
-                new_user = databases.create_document(
-                    database_id=APPWRITE_DATABASE_ID,
-                    collection_id=users_collection_id,
-                    document_id=user_id,  # Use email-based ID
-                    data={
-                        'email': email,
-                        'name': None,  # Can be updated later
-                        'Github_status': False,  # Default false
-                        'Repo_activation': False,  # Default false
-                        'createdAt': current_time,
-                        'updatedAt': current_time
-                    }
-                )
-                
-                return UserResponse(
-                    success=True,
-                    message="User created successfully",
-                    user_id=new_user['$id'],
-                    email=new_user['email'],
-                    name=new_user.get('name'),
-                    created_at=new_user.get('createdAt'),
-                    updated_at=new_user.get('updatedAt'),
-                    is_new_user=True,
-                    github_status=False,
-                    installation_id=None,
-                    repo_activation=False,
-                    activated_repo=None
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found"
                 )
             else:
-                # Some other error occurred
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=f"Database error: {str(e)}"
                 )
+        
+        # Check GitHub status and fetch installation_id if connected
+        github_status = bool(user_doc.get('Github_status', False))
+        installation_id = None
+        
+        if github_status:
+            try:
+                github_installations_collection_id = get_collection_id("github_installations")
+                installations = databases.list_documents(
+                    database_id=APPWRITE_DATABASE_ID,
+                    collection_id=github_installations_collection_id,
+                    queries=[Query.equal('userId', user_id)]
+                )
+                if installations['total'] > 0:
+                    installation_id = installations['documents'][0].get('githubInstallationId')
+            except Exception as e:
+                print(f"Error fetching installation: {e}")
+        
+        # Check repo activation status and fetch activated repo if true
+        repo_activation = bool(user_doc.get('Repo_activation', False))
+        activated_repo = None
+        
+        if repo_activation:
+            try:
+                activated_repos_collection_id = get_collection_id("activated_repos")
+                repos = databases.list_documents(
+                    database_id=APPWRITE_DATABASE_ID,
+                    collection_id=activated_repos_collection_id,
+                    queries=[Query.equal('userId', user_id)]
+                )
+                if repos['total'] > 0:
+                    repo_doc = repos['documents'][0]
+                    activated_repo = {
+                        "repo_full_name": repo_doc.get('repoFullName'),
+                        "default_branch": repo_doc.get('defaultBranch'),
+                        "is_active": repo_doc.get('isActive'),
+                        "activated_at": repo_doc.get('activatedAt'),
+                        "last_sync_at": repo_doc.get('lastSyncAt')
+                    }
+            except Exception as e:
+                print(f"Error fetching activated repo: {e}")
+        
+        # Return user data with GitHub and repo info
+        return UserResponse(
+            success=True,
+            message="User found",
+            user_id=user_doc['$id'],
+            email=user_doc['email'],
+            name=user_doc.get('name'),
+            created_at=user_doc.get('createdAt'),
+            updated_at=user_doc.get('updatedAt'),
+            is_new_user=False,
+            github_status=github_status,
+            installation_id=installation_id,
+            repo_activation=repo_activation,
+            activated_repo=activated_repo
+        )
                 
     except HTTPException:
         raise

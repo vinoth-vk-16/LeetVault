@@ -12,8 +12,9 @@ FastAPI backend service for managing GitHub App integration, LeetCode credential
 ## 📋 API Endpoints
 
 ### User Management
-- `POST /api/users/check` - Check if user exists, create if not
-- `GET /api/users/{email}` - Get user information by email
+- `POST /api/users/create` - Create a new user (returns error if user exists)
+- `GET /api/users/check?email={email}` - Get complete user information with GitHub and repo status
+- `GET /api/users/{email}` - Get basic user information by email
 
 ### LeetCode Credentials
 - `POST /api/leetcode/credentials` - Store/update LeetCode credentials

@@ -27,8 +27,8 @@ curl https://694f7e6e000aeef6e320.sgp.appwrite.run/health
 
 ### 1. User Management
 
-#### POST /api/users/check
-Check if user exists, create if not. Returns complete user status including GitHub and repository activation.
+#### POST /api/users/create
+Create a new user in the database. Returns error if user already exists.
 
 **Request Body:**
 ```json
@@ -40,7 +40,7 @@ Check if user exists, create if not. Returns complete user status including GitH
 **Field Requirements:**
 - `email` (required): Valid email address
 
-**Response (New User):**
+**Response (Success - 201 Created):**
 ```json
 {
   "success": true,
@@ -58,11 +58,33 @@ Check if user exists, create if not. Returns complete user status including GitH
 }
 ```
 
-**Response (Existing User with GitHub & Repo):**
+**Response (Error - User Exists - 409 Conflict):**
+```json
+{
+  "detail": "User already exists"
+}
+```
+
+**Curl Command:**
+```bash
+curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/users/create" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com"}'
+```
+
+---
+
+#### GET /api/users/check
+Get complete user information including GitHub status and repository activation details.
+
+**Query Parameters:**
+- `email` (required): User's email address
+
+**Response (User Found - 200 OK):**
 ```json
 {
   "success": true,
-  "message": "User already exists in database",
+  "message": "User found",
   "user_id": "user_example_com",
   "email": "user@example.com",
   "name": null,
@@ -82,11 +104,16 @@ Check if user exists, create if not. Returns complete user status including GitH
 }
 ```
 
+**Response (User Not Found - 404 Not Found):**
+```json
+{
+  "detail": "User not found"
+}
+```
+
 **Curl Command:**
 ```bash
-curl -X POST "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/users/check" \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com"}'
+curl -X GET "https://694f7e6e000aeef6e320.sgp.appwrite.run/api/users/check?email=user@example.com"
 ```
 
 ---
